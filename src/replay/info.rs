@@ -1,5 +1,5 @@
-use crate::replay::error::BsorError;
-use crate::replay::read_utils::{read_bool, read_byte, read_float, read_int, read_string};
+use super::error::BsorError;
+use super::read_utils::{read_bool, read_byte, read_float, read_int, read_string};
 use std::io::Read;
 
 #[derive(PartialEq, Debug)]

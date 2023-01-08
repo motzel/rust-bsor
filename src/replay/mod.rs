@@ -3,9 +3,9 @@ mod header;
 pub mod info;
 mod read_utils;
 
-use crate::replay::error::BsorError;
-use crate::replay::header::Header;
-use crate::replay::info::Info;
+pub use error::BsorError;
+use header::Header;
+pub use info::Info;
 use std::io::Read;
 
 #[derive(Debug)]

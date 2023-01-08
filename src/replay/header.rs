@@ -1,5 +1,5 @@
-use crate::replay::error::BsorError;
-use crate::replay::read_utils;
+use super::error::BsorError;
+use super::read_utils;
 use std::io::Read;
 
 pub(crate) struct Header {
