@@ -7,5 +7,5 @@ fn main() {
 
     let replay = Replay::load(br).unwrap();
 
-    println!("{:#?}", replay);
+    println!("{:#?}", replay.info);
 }
