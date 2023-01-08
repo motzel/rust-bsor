@@ -30,6 +30,14 @@ pub(crate) fn read_float<R: Read>(r: &mut R) -> Result<f32> {
     Ok(f32::from_le_bytes(buffer))
 }
 
+pub(crate) fn read_float_multi<R: Read>(r: &mut R, count: usize) -> Result<Vec<f32>> {
+    let mut buffer = vec![0; count * std::mem::size_of::<f32>()];
+
+    read_into_buffer(r, &mut buffer)?;
+
+    Ok(into_f32_vec(&buffer)?)
+}
+
 pub(crate) fn read_string<R: Read>(r: &mut R) -> Result<String> {
     let len = read_int(r)?;
     let mut buffer = vec![0; len as usize];
@@ -49,6 +57,20 @@ pub(crate) fn read_into_buffer<'a, R: Read>(r: &'a mut R, buffer: &'a mut [u8]) 
         Ok(_) => Ok(()),
         Err(e) => Err(BsorError::Io(e)),
     }
+}
+
+fn into_f32_vec(buf: &[u8]) -> Result<Vec<f32>> {
+    let count = buf.len() / std::mem::size_of::<f32>();
+
+    let mut vec = Vec::with_capacity(count);
+
+    for i in 0..count {
+        vec.push(f32::from_le_bytes(
+            buf[i * std::mem::size_of::<f32>()..(i + 1) * std::mem::size_of::<f32>()].try_into()?,
+        ));
+    }
+
+    Ok(vec)
 }
 
 #[cfg(test)]
@@ -115,5 +137,19 @@ mod tests {
         let value = read_string(&mut Cursor::new(test_string_buf)).unwrap();
 
         assert_eq!(value, test_string);
+    }
+
+    #[test]
+    fn it_can_read_multi_float() {
+        let floats = vec![1.0, 1.5, 2.0, 2.5, 3.0];
+        let mut u8_vec: Vec<u8> = Vec::with_capacity(floats.len() * std::mem::size_of::<f32>());
+
+        for i in 0..floats.len() {
+            u8_vec.extend_from_slice(&f32::to_le_bytes(floats[i]));
+        }
+
+        let result = read_float_multi(&mut Cursor::new(&u8_vec[..]), floats.len()).unwrap();
+
+        assert_eq!(floats, result);
     }
 }

@@ -95,16 +95,11 @@ impl Info {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests_util::append_str;
     use std::io::Cursor;
 
-    fn append_str(vec: &mut Vec<u8>, str: &str) {
-        let len = str.len() as i32;
-        vec.append(&mut i32::to_le_bytes(len).to_vec());
-        vec.append(&mut str.as_bytes().to_vec());
-    }
-
     #[test]
-    fn it_can_read_info() {
+    fn it_can_load_info() {
         let version = "0.5.4".to_owned();
         let game_version = "1.27.0".to_owned();
         let timestamp = "1662289178".to_owned();

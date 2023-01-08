@@ -1,3 +1,4 @@
+use std::array::TryFromSliceError;
 use std::num::ParseIntError;
 use std::{error, fmt, io};
 
@@ -33,6 +34,12 @@ impl From<io::Error> for BsorError {
 
 impl From<ParseIntError> for BsorError {
     fn from(error: ParseIntError) -> Self {
+        BsorError::DecodingError(Box::new(error))
+    }
+}
+
+impl From<TryFromSliceError> for BsorError {
+    fn from(error: TryFromSliceError) -> Self {
         BsorError::DecodingError(Box::new(error))
     }
 }
