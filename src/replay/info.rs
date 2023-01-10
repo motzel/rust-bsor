@@ -1,5 +1,6 @@
 use super::error::BsorError;
 use super::read_utils::{read_bool, read_byte, read_float, read_int, read_string};
+use crate::replay::{ReplayFloat, ReplayInt, ReplayTime, Result};
 use std::io::Read;
 
 #[derive(PartialEq, Debug)]
@@ -17,20 +18,20 @@ pub struct Info {
     pub song_name: String,
     pub mapper: String,
     pub difficulty: String,
-    pub score: i32,
+    pub score: ReplayInt,
     pub mode: String,
     pub environment: String,
     pub modifiers: String,
-    pub jump_distance: f32,
+    pub jump_distance: ReplayFloat,
     pub left_handed: bool,
-    pub height: f32,
-    pub start_time: f32,
-    pub fail_time: f32,
-    pub speed: f32,
+    pub height: ReplayFloat,
+    pub start_time: ReplayTime,
+    pub fail_time: ReplayTime,
+    pub speed: ReplayTime,
 }
 
 impl Info {
-    pub(crate) fn load<R: Read>(r: &mut R) -> Result<Info, BsorError> {
+    pub(crate) fn load<R: Read>(r: &mut R) -> Result<Info> {
         match read_byte(r) {
             Ok(v) => {
                 if v != 0 {
@@ -138,16 +139,16 @@ mod tests {
         append_str(&mut buf, &song_name);
         append_str(&mut buf, &mapper);
         append_str(&mut buf, &difficulty);
-        buf.append(&mut i32::to_le_bytes(score).to_vec());
+        buf.append(&mut ReplayInt::to_le_bytes(score).to_vec());
         append_str(&mut buf, &mode);
         append_str(&mut buf, &environment);
         append_str(&mut buf, &modifiers);
-        buf.append(&mut f32::to_le_bytes(jump_distance).to_vec());
+        buf.append(&mut ReplayFloat::to_le_bytes(jump_distance).to_vec());
         buf.append(&mut (if left_handed { [1] } else { [0] }).to_vec());
-        buf.append(&mut f32::to_le_bytes(height).to_vec());
-        buf.append(&mut f32::to_le_bytes(start_time).to_vec());
-        buf.append(&mut f32::to_le_bytes(fail_time).to_vec());
-        buf.append(&mut f32::to_le_bytes(speed).to_vec());
+        buf.append(&mut ReplayFloat::to_le_bytes(height).to_vec());
+        buf.append(&mut ReplayFloat::to_le_bytes(start_time).to_vec());
+        buf.append(&mut ReplayFloat::to_le_bytes(fail_time).to_vec());
+        buf.append(&mut ReplayFloat::to_le_bytes(speed).to_vec());
 
         let result = Info::load(&mut Cursor::new(buf)).unwrap();
 

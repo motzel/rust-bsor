@@ -1,4 +1,5 @@
 use super::error::BsorError;
+use crate::replay::{ReplayFloat, ReplayInt};
 use std::io::Read;
 
 type Result<T> = std::result::Result<T, BsorError>;
@@ -16,26 +17,26 @@ pub(crate) fn read_bool<R: Read>(r: &mut R) -> Result<bool> {
     Ok(b == 1)
 }
 
-pub(crate) fn read_int<R: Read>(r: &mut R) -> Result<i32> {
-    let mut buffer = [0; std::mem::size_of::<i32>()];
+pub(crate) fn read_int<R: Read>(r: &mut R) -> Result<ReplayInt> {
+    let mut buffer = [0; std::mem::size_of::<ReplayInt>()];
     read_into_buffer(r, &mut buffer)?;
 
-    Ok(i32::from_le_bytes(buffer))
+    Ok(ReplayInt::from_le_bytes(buffer))
 }
 
-pub(crate) fn read_float<R: Read>(r: &mut R) -> Result<f32> {
-    let mut buffer = [0; std::mem::size_of::<f32>()];
+pub(crate) fn read_float<R: Read>(r: &mut R) -> Result<ReplayFloat> {
+    let mut buffer = [0; std::mem::size_of::<ReplayFloat>()];
     read_into_buffer(r, &mut buffer)?;
 
-    Ok(f32::from_le_bytes(buffer))
+    Ok(ReplayFloat::from_le_bytes(buffer))
 }
 
-pub(crate) fn read_float_multi<R: Read>(r: &mut R, count: usize) -> Result<Vec<f32>> {
-    let mut buffer = vec![0; count * std::mem::size_of::<f32>()];
+pub(crate) fn read_float_multi<R: Read>(r: &mut R, count: usize) -> Result<Vec<ReplayFloat>> {
+    let mut buffer = vec![0; count * std::mem::size_of::<ReplayFloat>()];
 
     read_into_buffer(r, &mut buffer)?;
 
-    Ok(into_f32_vec(&buffer)?)
+    Ok(into_replay_float_vec(&buffer)?)
 }
 
 pub(crate) fn read_string<R: Read>(r: &mut R) -> Result<String> {
@@ -59,14 +60,16 @@ pub(crate) fn read_into_buffer<'a, R: Read>(r: &'a mut R, buffer: &'a mut [u8]) 
     }
 }
 
-fn into_f32_vec(buf: &[u8]) -> Result<Vec<f32>> {
-    let count = buf.len() / std::mem::size_of::<f32>();
+fn into_replay_float_vec(buf: &[u8]) -> Result<Vec<ReplayFloat>> {
+    let count = buf.len() / std::mem::size_of::<ReplayFloat>();
 
     let mut vec = Vec::with_capacity(count);
 
     for i in 0..count {
-        vec.push(f32::from_le_bytes(
-            buf[i * std::mem::size_of::<f32>()..(i + 1) * std::mem::size_of::<f32>()].try_into()?,
+        vec.push(ReplayFloat::from_le_bytes(
+            buf[i * std::mem::size_of::<ReplayFloat>()
+                ..(i + 1) * std::mem::size_of::<ReplayFloat>()]
+                .try_into()?,
         ));
     }
 
@@ -90,19 +93,19 @@ mod tests {
 
     #[test]
     fn it_can_read_int() {
-        let test_i32_buf = [1, 2, 3, 4];
+        let test_replay_int_buf = [1, 2, 3, 4];
 
-        let value = read_int(&mut Cursor::new(test_i32_buf)).unwrap();
+        let value = read_int(&mut Cursor::new(test_replay_int_buf)).unwrap();
 
-        assert_eq!(value, i32::from_le_bytes(test_i32_buf));
+        assert_eq!(value, ReplayInt::from_le_bytes(test_replay_int_buf));
     }
 
     #[test]
     fn it_can_read_float() {
         let f = 3.14;
-        let test_f32_buf = f32::to_le_bytes(f);
+        let test_replay_float_buf = ReplayFloat::to_le_bytes(f);
 
-        let value = read_float(&mut Cursor::new(test_f32_buf)).unwrap();
+        let value = read_float(&mut Cursor::new(test_replay_float_buf)).unwrap();
 
         assert_eq!(f, value);
     }
@@ -130,8 +133,8 @@ mod tests {
     fn it_can_read_string() {
         let test_string = "test_str";
 
-        let len = test_string.len() as i32;
-        let mut test_string_buf = i32::to_le_bytes(len).to_vec();
+        let len = test_string.len() as ReplayInt;
+        let mut test_string_buf = ReplayInt::to_le_bytes(len).to_vec();
         test_string_buf.append(&mut test_string.as_bytes().to_vec());
 
         let value = read_string(&mut Cursor::new(test_string_buf)).unwrap();
@@ -142,10 +145,11 @@ mod tests {
     #[test]
     fn it_can_read_multi_float() {
         let floats = vec![1.0, 1.5, 2.0, 2.5, 3.0];
-        let mut u8_vec: Vec<u8> = Vec::with_capacity(floats.len() * std::mem::size_of::<f32>());
+        let mut u8_vec: Vec<u8> =
+            Vec::with_capacity(floats.len() * std::mem::size_of::<ReplayFloat>());
 
         for i in 0..floats.len() {
-            u8_vec.extend_from_slice(&f32::to_le_bytes(floats[i]));
+            u8_vec.extend_from_slice(&ReplayFloat::to_le_bytes(floats[i]));
         }
 
         let result = read_float_multi(&mut Cursor::new(&u8_vec[..]), floats.len()).unwrap();

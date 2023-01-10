@@ -16,13 +16,29 @@ pub mod replay;
 
 #[cfg(test)]
 pub(crate) mod tests_util {
-    use crate::replay::vector::{Vector3, Vector4};
+    use crate::replay::{
+        vector::{Vector3, Vector4},
+        ReplayFloat,
+    };
     use rand::random;
 
     pub(crate) fn append_str(vec: &mut Vec<u8>, str: &str) {
         let len = str.len() as i32;
         vec.append(&mut i32::to_le_bytes(len).to_vec());
         vec.append(&mut str.as_bytes().to_vec());
+    }
+
+    pub(crate) fn append_vector3(vec: &mut Vec<u8>, v3: &Vector3) {
+        vec.append(&mut ReplayFloat::to_le_bytes(v3.x).to_vec());
+        vec.append(&mut ReplayFloat::to_le_bytes(v3.y).to_vec());
+        vec.append(&mut ReplayFloat::to_le_bytes(v3.z).to_vec());
+    }
+
+    pub(crate) fn append_vector4(vec: &mut Vec<u8>, v4: &Vector4) {
+        vec.append(&mut ReplayFloat::to_le_bytes(v4.x).to_vec());
+        vec.append(&mut ReplayFloat::to_le_bytes(v4.y).to_vec());
+        vec.append(&mut ReplayFloat::to_le_bytes(v4.z).to_vec());
+        vec.append(&mut ReplayFloat::to_le_bytes(v4.w).to_vec());
     }
 
     pub(crate) fn generate_random_vec3() -> Vector3 {

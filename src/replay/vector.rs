@@ -1,11 +1,11 @@
-use crate::replay::{read_utils, BsorError};
+use crate::replay::{read_utils, BsorError, ReplayFloat};
 use std::io::Read;
 
 #[derive(PartialEq, Debug)]
 pub struct Vector3 {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
+    pub x: ReplayFloat,
+    pub y: ReplayFloat,
+    pub z: ReplayFloat,
 }
 
 impl Vector3 {
@@ -32,10 +32,10 @@ impl From<Vector4> for Vector3 {
 
 #[derive(PartialEq, Debug)]
 pub struct Vector4 {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-    pub w: f32,
+    pub x: ReplayFloat,
+    pub y: ReplayFloat,
+    pub z: ReplayFloat,
+    pub w: ReplayFloat,
 }
 
 impl Vector4 {
@@ -70,10 +70,11 @@ mod tests {
     #[test]
     fn it_can_load_vector3() {
         let floats = [1.0, 1.5, 2.0];
-        let mut u8_vec: Vec<u8> = Vec::with_capacity(floats.len() * std::mem::size_of::<f32>());
+        let mut u8_vec: Vec<u8> =
+            Vec::with_capacity(floats.len() * std::mem::size_of::<ReplayFloat>());
 
         for i in 0..floats.len() {
-            u8_vec.extend_from_slice(&f32::to_le_bytes(floats[i]));
+            u8_vec.extend_from_slice(&ReplayFloat::to_le_bytes(floats[i]));
         }
 
         let result = Vector3::load(&mut Cursor::new(&u8_vec[..])).unwrap();
@@ -86,10 +87,11 @@ mod tests {
     #[test]
     fn it_can_load_vector4() {
         let floats = [1.0, 1.5, 2.0, 2.5];
-        let mut u8_vec: Vec<u8> = Vec::with_capacity(floats.len() * std::mem::size_of::<f32>());
+        let mut u8_vec: Vec<u8> =
+            Vec::with_capacity(floats.len() * std::mem::size_of::<ReplayFloat>());
 
         for i in 0..floats.len() {
-            u8_vec.extend_from_slice(&f32::to_le_bytes(floats[i]));
+            u8_vec.extend_from_slice(&ReplayFloat::to_le_bytes(floats[i]));
         }
 
         let result = Vector4::load(&mut Cursor::new(&u8_vec[..])).unwrap();

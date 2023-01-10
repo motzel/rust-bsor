@@ -1,5 +1,4 @@
-use super::error::BsorError;
-use super::read_utils;
+use super::{error::BsorError, read_utils, Result};
 use std::io::Read;
 
 pub(crate) struct Header {
@@ -7,7 +6,7 @@ pub(crate) struct Header {
 }
 
 impl Header {
-    pub(crate) fn load<R: Read>(r: &mut R) -> Result<Header, BsorError> {
+    pub(crate) fn load<R: Read>(r: &mut R) -> Result<Header> {
         let magic = read_utils::read_int(r)?;
         let version = read_utils::read_byte(r)?;
 
