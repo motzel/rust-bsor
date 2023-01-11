@@ -1,17 +1,17 @@
 [package]
 name = "bsor"
 version = "0.1.0"
+description = "Read and parse BS Open Replay (bsor) files"
+license = "GPL-3.0-or-later"
+readme = "README.md"
+repository = "https://github.com/motzel/rust-bsor"
+keywords = ["bsor", "beat-saber", "beat-leader"]
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+exclude = ["src/main.rs"]
 
 [lib]
 name = "bsor"
 path = "src/lib.rs"
-
-[[bin]]
-name = "main"
-path = "src/main.rs"
 
 [dev-dependencies]
 rand = "0.8.5"

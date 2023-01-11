@@ -1,9 +1,7 @@
 use crate::replay::{
-    read_utils, vector::Vector3, BsorError, LineValue, ReplayFloat, ReplayInt, ReplayTime,
+    read_utils, vector::Vector3, BsorError, LineValue, ReplayFloat, ReplayInt, ReplayTime, Result,
 };
 use std::io::Read;
-
-type Result<T> = std::result::Result<T, BsorError>;
 
 #[derive(Debug)]
 pub struct Notes(Vec<Note>);
@@ -42,15 +40,15 @@ type LayerValue = u8;
 
 #[derive(Debug, PartialEq)]
 pub struct Note {
-    scoring_type: NoteScoringType,
-    line_idx: LineValue,
-    line_layer: LayerValue,
-    color_type: ColorType,
-    cut_direction: CutDirection,
-    event_time: ReplayTime,
-    spawn_time: ReplayTime,
-    event_type: NoteEventType,
-    cut_info: Option<NoteCutInfo>,
+    pub scoring_type: NoteScoringType,
+    pub line_idx: LineValue,
+    pub line_layer: LayerValue,
+    pub color_type: ColorType,
+    pub cut_direction: CutDirection,
+    pub event_time: ReplayTime,
+    pub spawn_time: ReplayTime,
+    pub event_type: NoteEventType,
+    pub cut_info: Option<NoteCutInfo>,
 }
 
 impl Note {
@@ -96,21 +94,21 @@ impl Note {
 
 #[derive(Debug, PartialEq)]
 pub struct NoteCutInfo {
-    speed_ok: bool,
-    direction_ok: bool,
-    saber_type_ok: bool,
-    was_cut_too_soon: bool,
-    saber_speed: ReplayFloat,
-    saber_dir: Vector3,
-    saber_type: ColorType,
-    time_deviation: ReplayFloat,
-    cut_dir_deviation: ReplayFloat,
-    cut_point: Vector3,
-    cut_normal: Vector3,
-    cut_distance_to_center: ReplayFloat,
-    cut_angle: ReplayFloat,
-    before_cut_rating: ReplayFloat,
-    after_cut_rating: ReplayFloat,
+    pub speed_ok: bool,
+    pub direction_ok: bool,
+    pub saber_type_ok: bool,
+    pub was_cut_too_soon: bool,
+    pub saber_speed: ReplayFloat,
+    pub saber_dir: Vector3,
+    pub saber_type: ColorType,
+    pub time_deviation: ReplayFloat,
+    pub cut_dir_deviation: ReplayFloat,
+    pub cut_point: Vector3,
+    pub cut_normal: Vector3,
+    pub cut_distance_to_center: ReplayFloat,
+    pub cut_angle: ReplayFloat,
+    pub before_cut_rating: ReplayFloat,
+    pub after_cut_rating: ReplayFloat,
 }
 
 impl NoteCutInfo {

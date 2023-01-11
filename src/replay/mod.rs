@@ -10,14 +10,14 @@ pub mod vector;
 pub mod wall;
 
 pub use error::BsorError;
-pub use frame::{Frame, Frames};
+use frame::Frames;
 use header::Header;
-pub use height::{Height, Heights};
-pub use info::Info;
-pub use note::{Note, Notes};
-pub use pause::{Pause, Pauses};
+use height::Heights;
+use info::Info;
+use note::Notes;
+use pause::Pauses;
 use std::io::Read;
-pub use wall::{Wall, Walls};
+use wall::Walls;
 
 pub type ReplayInt = i32;
 pub type ReplayLong = u64;

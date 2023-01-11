@@ -4,6 +4,10 @@
 
 Disclaimer: This is my Rust learning project, so expect bugs and non-idomatic code
 
+## Known limitations
+
+Version 0.1.0 does not support replays saved out of specification by a very old version of the Beat Leader mod (incorrect utf8 string encoding).
+
 ## Install
 
 Run following Cargo command in your project directory

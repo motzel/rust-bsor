@@ -1,8 +1,6 @@
 use super::error::BsorError;
-use crate::replay::{ReplayFloat, ReplayInt, ReplayLong};
+use crate::replay::{ReplayFloat, ReplayInt, ReplayLong, Result};
 use std::io::Read;
-
-type Result<T> = std::result::Result<T, BsorError>;
 
 pub(crate) fn read_byte<R: Read>(r: &mut R) -> Result<u8> {
     let mut buffer = [0; std::mem::size_of::<u8>()];
