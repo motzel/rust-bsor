@@ -6,7 +6,7 @@ Disclaimer: This is my Rust learning project, so expect bugs and non-idomatic co
 
 ## Known limitations
 
-Version 0.1.0 does not support replays saved out of specification by a very old version of the Beat Leader mod (incorrect utf8 string encoding).
+Version 0.1.1 does not support replays saved out of specification by a very old version of the Beat Leader mod (incorrect utf8 string encoding).
 
 ## Install
 
@@ -19,7 +19,7 @@ cargo add bsor
 Or add the following line to your ``[dependencies]`` section of the ``Cargo.toml``:
 
 ```toml
-bsor = "0.1.0"
+bsor = "0.1.1"
 ```
 
 ## Usage
