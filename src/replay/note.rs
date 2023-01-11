@@ -1,4 +1,6 @@
-use crate::replay::{read_utils, vector::Vector3, BsorError, ReplayFloat, ReplayInt, ReplayTime};
+use crate::replay::{
+    read_utils, vector::Vector3, BsorError, LineValue, ReplayFloat, ReplayInt, ReplayTime,
+};
 use std::io::Read;
 
 type Result<T> = std::result::Result<T, BsorError>;
@@ -36,7 +38,6 @@ impl Notes {
     }
 }
 
-type LineValue = u8;
 type LayerValue = u8;
 
 #[derive(Debug, PartialEq)]
