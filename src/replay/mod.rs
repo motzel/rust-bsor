@@ -1,12 +1,14 @@
 pub mod error;
 pub mod frame;
 mod header;
+pub mod height;
 pub mod info;
 pub mod note;
 mod read_utils;
 pub mod vector;
 pub mod wall;
 
+use crate::replay::height::Heights;
 pub use error::BsorError;
 pub use frame::{Frame, Frames};
 use header::Header;
@@ -29,6 +31,7 @@ pub struct Replay {
     pub frames: Frames,
     pub notes: Notes,
     pub walls: Walls,
+    pub heights: Heights,
 }
 
 impl Replay {
@@ -38,6 +41,7 @@ impl Replay {
         let frames = Frames::load(r)?;
         let notes = Notes::load(r)?;
         let walls = Walls::load(r)?;
+        let heights = Heights::load(r)?;
 
         Ok(Replay {
             version: header.version,
@@ -45,6 +49,7 @@ impl Replay {
             frames,
             notes,
             walls,
+            heights,
         })
     }
 }
