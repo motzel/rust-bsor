@@ -1,5 +1,5 @@
 use super::error::BsorError;
-use crate::replay::{ReplayFloat, ReplayInt};
+use crate::replay::{ReplayFloat, ReplayInt, ReplayLong};
 use std::io::Read;
 
 type Result<T> = std::result::Result<T, BsorError>;
@@ -22,6 +22,13 @@ pub(crate) fn read_int<R: Read>(r: &mut R) -> Result<ReplayInt> {
     read_into_buffer(r, &mut buffer)?;
 
     Ok(ReplayInt::from_le_bytes(buffer))
+}
+
+pub(crate) fn read_long<R: Read>(r: &mut R) -> Result<ReplayLong> {
+    let mut buffer = [0; std::mem::size_of::<ReplayLong>()];
+    read_into_buffer(r, &mut buffer)?;
+
+    Ok(ReplayLong::from_le_bytes(buffer))
 }
 
 pub(crate) fn read_float<R: Read>(r: &mut R) -> Result<ReplayFloat> {
@@ -98,6 +105,15 @@ mod tests {
         let value = read_int(&mut Cursor::new(test_replay_int_buf)).unwrap();
 
         assert_eq!(value, ReplayInt::from_le_bytes(test_replay_int_buf));
+    }
+
+    #[test]
+    fn it_can_read_long() {
+        let test_replay_long_buf = [1, 2, 3, 4, 5, 6, 7, 8];
+
+        let value = read_long(&mut Cursor::new(test_replay_long_buf)).unwrap();
+
+        assert_eq!(value, ReplayLong::from_le_bytes(test_replay_long_buf));
     }
 
     #[test]
