@@ -1,6 +1,6 @@
 # rust-bsor
 
-[BS Open Replay](https://github.com/BeatLeader/BeatSaber-Web-Replays) Rust parser
+[BS Open Replay](https://github.com/BeatLeader/BS-Open-Replay) Rust parser
 
 Disclaimer: This is my Rust learning project, so expect bugs and non-idomatic code
 
