@@ -32,6 +32,10 @@ impl Frames {
     pub fn len(&self) -> usize {
         self.0.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.len() == 0
+    }
 }
 
 #[derive(PartialEq, Debug)]
@@ -80,7 +84,9 @@ impl Frame {
 mod tests {
     use super::*;
     use crate::replay::ReplayFloat;
-    use crate::tests_util::{append_vector3, append_vector4, generate_random_vec3, generate_random_vec4};
+    use crate::tests_util::{
+        append_vector3, append_vector4, generate_random_vec3, generate_random_vec4,
+    };
     use rand::random;
     use std::io::Cursor;
 
