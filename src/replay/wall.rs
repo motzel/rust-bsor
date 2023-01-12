@@ -54,10 +54,10 @@ impl Wall {
         let mut wall_id = read_utils::read_int(r)?;
 
         let line_idx = (wall_id / 100) as LineValue;
-        wall_id = wall_id % 100;
+        wall_id %= 100;
 
         let obstacle_type = (wall_id / 10) as u8;
-        wall_id = wall_id % 10;
+        wall_id %= 10;
 
         let width = wall_id as u8;
 

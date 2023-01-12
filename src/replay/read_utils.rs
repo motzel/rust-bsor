@@ -41,7 +41,7 @@ pub(crate) fn read_float_multi<R: Read>(r: &mut R, count: usize) -> Result<Vec<R
 
     read_into_buffer(r, &mut buffer)?;
 
-    Ok(into_replay_float_vec(&buffer)?)
+    into_replay_float_vec(&buffer)
 }
 
 pub(crate) fn read_string<R: Read>(r: &mut R) -> Result<String> {

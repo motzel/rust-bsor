@@ -59,3 +59,25 @@ impl Replay {
         })
     }
 }
+
+#[derive(Debug)]
+pub struct ParsedReplay {
+    pub version: u8,
+    info: Info,
+}
+
+impl ParsedReplay {
+    pub fn parse<R: Read>(r: &mut R) -> Result<ParsedReplay> {
+        let header = Header::load(r)?;
+        let info = Info::load(r)?;
+
+        Ok(ParsedReplay {
+            version: header.version,
+            info,
+        })
+    }
+
+    pub fn get_info(&self) -> &Info {
+        &self.info
+    }
+}

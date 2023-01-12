@@ -60,16 +60,16 @@ impl Note {
         let mut note_id = read_utils::read_int(r)?;
 
         let scoring_type = NoteScoringType::try_from((note_id / 10000) as u8)?;
-        note_id = note_id % 10000;
+        note_id %= 10000;
 
         let line_idx = (note_id / 1000) as LineValue;
-        note_id = note_id % 1000;
+        note_id %= 1000;
 
         let line_layer = (note_id / 100) as LayerValue;
-        note_id = note_id % 100;
+        note_id %= 100;
 
         let color_type = ColorType::try_from((note_id / 10) as u8)?;
-        note_id = note_id % 10;
+        note_id %= 10;
 
         let cut_direction = CutDirection::try_from(note_id as u8)?;
 
