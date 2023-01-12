@@ -1,6 +1,11 @@
 use super::{read_utils, BsorError, ReplayTime, Result};
-use crate::replay::ReplayLong;
-use std::io::Read;
+use crate::replay::{
+    assert_start_of_block, BlockType, CouldLoadBlock, CouldLoadBlockSize, HasStaticBlockSize,
+    ParsedReplayBlock, ReplayFloat, ReplayInt, ReplayLong,
+};
+use std::io::{Read, Seek, SeekFrom};
+use std::marker::PhantomData;
+use std::mem::size_of;
 
 #[derive(Debug, PartialEq)]
 pub struct Pauses(Vec<Pause>);
@@ -26,6 +31,15 @@ impl Pauses {
         Ok(Pauses(vec))
     }
 
+    pub fn load_block<RS: Read + Seek>(
+        r: &mut RS,
+        block: &ParsedReplayBlock<Pauses>,
+    ) -> Result<Self> {
+        r.seek(SeekFrom::Start(block.pos))?;
+
+        Self::load(r)
+    }
+
     pub fn get_vec(&self) -> &Vec<Pause> {
         &self.0
     }
@@ -36,6 +50,41 @@ impl Pauses {
 
     pub fn is_empty(&self) -> bool {
         self.0.len() == 0
+    }
+}
+
+impl HasStaticBlockSize for Pauses {
+    fn get_static_size() -> usize {
+        size_of::<u8>() + size_of::<ReplayInt>()
+    }
+}
+
+impl CouldLoadBlock for ParsedReplayBlock<Pauses> {
+    type Item = Pauses;
+
+    fn load<RS: Read + Seek>(&self, r: &mut RS) -> Result<Self::Item> {
+        Self::Item::load_block(r, self)
+    }
+}
+
+impl CouldLoadBlockSize for Pauses {
+    type Item = Pauses;
+
+    fn get_total_block_size<RS: Read + Seek>(
+        r: &mut RS,
+        pos: u64,
+    ) -> Result<ParsedReplayBlock<Pauses>> {
+        assert_start_of_block(r, BlockType::Pauses)?;
+
+        let count = read_utils::read_int(r)?;
+
+        Ok(ParsedReplayBlock::<Pauses> {
+            pos,
+            bytes: Pauses::get_static_size() as u64
+                + Pause::get_static_size() as u64 * count as u64,
+            items_count: count,
+            _phantom: PhantomData,
+        })
     }
 }
 
@@ -52,6 +101,16 @@ impl Pause {
 
         Ok(Self { duration, time })
     }
+}
+
+impl HasStaticBlockSize for Pause {
+    fn get_static_size() -> usize {
+        size_of::<ReplayLong>() + size_of::<ReplayFloat>()
+    }
+}
+
+impl CouldLoadBlockSize for Pause {
+    type Item = Pause;
 }
 
 #[cfg(test)]
@@ -73,6 +132,23 @@ mod tests {
         vec.append(&mut ReplayFloat::to_le_bytes(pause.time).to_vec());
     }
 
+    pub(self) fn get_pauses_buffer(pauses: &Vec<Pause>) -> Result<Vec<u8>> {
+        let pauses_id = BlockType::Pauses.try_into()?;
+        let mut buf: Vec<u8> = Vec::from([pauses_id]);
+
+        buf.append(&mut ReplayInt::to_le_bytes(pauses.len() as ReplayInt).to_vec());
+        for f in pauses.iter() {
+            append_pause(&mut buf, &f);
+        }
+
+        Ok(buf)
+    }
+
+    #[test]
+    fn it_returns_correct_static_size_of_pause() {
+        assert_eq!(Pause::get_static_size(), 12);
+    }
+
     #[test]
     fn it_can_load_pause() {
         let pause = generate_random_pause();
@@ -86,17 +162,61 @@ mod tests {
     }
 
     #[test]
-    fn it_can_load_pauses() {
+    fn it_returns_correct_static_size_of_pauses() {
+        assert_eq!(Pauses::get_static_size(), 5);
+    }
+
+    #[test]
+    fn it_returns_invalid_bsor_error_when_pauses_block_id_is_invalid() -> Result<()> {
         let pauses = Vec::from([generate_random_pause(), generate_random_pause()]);
 
-        let mut buf: Vec<u8> = Vec::from([5u8]);
-        buf.append(&mut ReplayInt::to_le_bytes(pauses.len() as ReplayInt).to_vec());
-        for f in pauses.iter() {
-            append_pause(&mut buf, &f);
-        }
+        let mut buf = get_pauses_buffer(&pauses)?;
+        buf[0] = 255;
+
+        let result = Pauses::load(&mut Cursor::new(buf));
+
+        assert!(matches!(result, Err(BsorError::InvalidBsor)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn it_can_load_pauses() -> Result<()> {
+        let pauses = Vec::from([generate_random_pause(), generate_random_pause()]);
+
+        let buf = get_pauses_buffer(&pauses)?;
 
         let result = Pauses::load(&mut Cursor::new(buf)).unwrap();
 
-        assert_eq!(*result.get_vec(), pauses)
+        assert_eq!(*result.get_vec(), pauses);
+        assert_eq!(result.is_empty(), false);
+        assert_eq!(result.len(), pauses.len());
+
+        Ok(())
+    }
+
+    #[test]
+    fn it_can_load_parsed_pauses_block() -> Result<()> {
+        let pauses = Vec::from([generate_random_pause(), generate_random_pause()]);
+
+        let buf = get_pauses_buffer(&pauses)?;
+
+        let pos = 0;
+        let reader = &mut Cursor::new(buf);
+        let walls_block = Pauses::get_total_block_size(reader, pos)?;
+
+        let result = walls_block.load(reader)?;
+
+        assert_eq!(walls_block.pos(), pos);
+        assert_eq!(
+            walls_block.bytes(),
+            Pauses::get_static_size() as u64
+                + Pause::get_static_size() as u64 * pauses.len() as u64
+        );
+        assert_eq!(walls_block.is_empty(), false);
+        assert_eq!(walls_block.len(), pauses.len() as i32);
+        assert_eq!(*result.get_vec(), pauses);
+
+        Ok(())
     }
 }

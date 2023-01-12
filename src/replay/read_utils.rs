@@ -50,10 +50,7 @@ pub(crate) fn read_string<R: Read>(r: &mut R) -> Result<String> {
 
     read_into_buffer(r, &mut buffer)?;
 
-    match std::str::from_utf8(&buffer) {
-        Ok(v) => Ok(v.to_owned()),
-        Err(e) => Err(BsorError::DecodingError(Box::new(e))),
-    }
+    Ok(std::str::from_utf8(&buffer)?.to_owned())
 }
 
 pub(crate) fn read_into_buffer<'a, R: Read>(r: &'a mut R, buffer: &'a mut [u8]) -> Result<()> {
@@ -94,6 +91,24 @@ mod tests {
         read_into_buffer(&mut Cursor::new(test_values), &mut buffer).unwrap();
 
         assert_eq!(buffer, test_values);
+    }
+
+    #[test]
+    fn it_returns_io_error() {
+        let test_values = [0x1];
+        let mut buffer = [0u8; 4];
+
+        let result = read_into_buffer(&mut Cursor::new(test_values), &mut buffer);
+
+        assert!(result.is_err());
+
+        let io_err_kind = match result {
+            Ok(_) => panic!("error is expected!"),
+            Err(BsorError::Io(e)) => e.kind(),
+            _ => panic!("invalid error type!"),
+        };
+
+        assert_eq!(std::io::ErrorKind::UnexpectedEof, io_err_kind);
     }
 
     #[test]
@@ -154,6 +169,15 @@ mod tests {
         let value = read_string(&mut Cursor::new(test_string_buf)).unwrap();
 
         assert_eq!(value, test_string);
+    }
+
+    #[test]
+    fn it_returns_decoding_error_if_string_is_invalid() {
+        let invalid_string_buf = [0xffu8, 0xff];
+
+        let result = read_string(&mut Cursor::new(invalid_string_buf));
+
+        assert!(result.is_err());
     }
 
     #[test]

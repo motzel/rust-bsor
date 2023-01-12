@@ -1,6 +1,8 @@
 use super::{error::BsorError, read_utils, Result};
 use std::io::Read;
 
+const BSOR_MAGIC: i32 = 0x442d3d69;
+
 pub(crate) struct Header {
     pub version: u8,
 }
@@ -25,27 +27,51 @@ impl Header {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::replay::ReplayInt;
+    use rand::random;
     use std::io::Cursor;
 
     #[test]
     fn it_return_error_when_header_magic_is_invalid() {
-        let result = Header::load(&mut Cursor::new([0x68, 0x3d, 0x2d, 0x44, 1]));
+        let mut buf = ReplayInt::to_le_bytes(BSOR_MAGIC + 1).to_vec();
+        buf.push(1);
+
+        let result = Header::load(&mut Cursor::new(buf));
 
         assert!(matches!(result, Err(BsorError::InvalidBsor)));
     }
 
     #[test]
     fn it_return_error_when_header_version_is_invalid() {
-        let result = Header::load(&mut Cursor::new([0x69, 0x3d, 0x2d, 0x44, 10]));
+        let invalid_version = random::<u8>();
+
+        let mut buf = ReplayInt::to_le_bytes(BSOR_MAGIC).to_vec();
+        buf.push(invalid_version);
+
+        let result = Header::load(&mut Cursor::new(buf));
 
         assert!(matches!(result, Err(BsorError::UnsupportedVersion(_))));
+
+        let reported_version = match result {
+            Ok(_) => panic!("should be error!"),
+            Err(BsorError::UnsupportedVersion(v)) => v,
+            _ => panic!("invalid error"),
+        };
+
+        assert_eq!(invalid_version, reported_version)
     }
 
     #[test]
-    fn it_can_load_header() {
-        let file = &mut Cursor::new([0x69, 0x3d, 0x2d, 0x44, 1]);
+    fn it_can_load_header() -> Result<()> {
+        let mut buf = ReplayInt::to_le_bytes(BSOR_MAGIC).to_vec();
+        buf.push(1);
+
+        let file = &mut Cursor::new(buf);
         let result = Header::load(file);
 
         assert!(!result.is_err());
+        assert_eq!(result?.version, 1);
+
+        Ok(())
     }
 }

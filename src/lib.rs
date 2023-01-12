@@ -1,3 +1,5 @@
+extern crate core;
+
 /// Read and parse BS Open Replay (bsor) files
 ///
 /// <https://github.com/BeatLeader/BS-Open-Replay>

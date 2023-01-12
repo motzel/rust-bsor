@@ -1,7 +1,7 @@
-use crate::replay::{read_utils, BsorError, ReplayFloat};
+use crate::replay::{read_utils, BsorError, HasStaticBlockSize, ReplayFloat};
 use std::io::Read;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct Vector3 {
     pub x: ReplayFloat,
     pub y: ReplayFloat,
@@ -20,6 +20,12 @@ impl Vector3 {
     }
 }
 
+impl HasStaticBlockSize for Vector3 {
+    fn get_static_size() -> usize {
+        std::mem::size_of::<ReplayFloat>() * 3
+    }
+}
+
 impl From<Vector4> for Vector3 {
     fn from(v: Vector4) -> Self {
         Self {
@@ -30,7 +36,7 @@ impl From<Vector4> for Vector3 {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct Vector4 {
     pub x: ReplayFloat,
     pub y: ReplayFloat,
@@ -48,6 +54,12 @@ impl Vector4 {
             z: vec[2],
             w: vec[3],
         })
+    }
+}
+
+impl HasStaticBlockSize for Vector4 {
+    fn get_static_size() -> usize {
+        std::mem::size_of::<ReplayFloat>() * 4
     }
 }
 
@@ -100,5 +112,37 @@ mod tests {
         assert_eq!(floats[1], result.y);
         assert_eq!(floats[2], result.z);
         assert_eq!(floats[3], result.w);
+    }
+
+    #[test]
+    fn it_can_convert_vector3_to_vector4() {
+        let v3 = Vector3 {
+            x: 1.0,
+            y: 2.0,
+            z: 3.0,
+        };
+
+        let v4 = Vector4::from(v3.clone());
+
+        assert_eq!(v3.x, v4.x);
+        assert_eq!(v3.y, v4.y);
+        assert_eq!(v3.z, v4.z);
+        assert_eq!(0.0, v4.w);
+    }
+
+    #[test]
+    fn it_can_convert_vector4_to_vector3() {
+        let v4 = Vector4 {
+            x: 1.0,
+            y: 2.0,
+            z: 3.0,
+            w: 4.0,
+        };
+
+        let v3 = Vector3::from(v4.clone());
+
+        assert_eq!(v3.x, v4.x);
+        assert_eq!(v3.y, v4.y);
+        assert_eq!(v3.z, v4.z);
     }
 }

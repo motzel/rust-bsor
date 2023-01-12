@@ -1,6 +1,5 @@
-use super::error::BsorError;
-use super::read_utils::{read_bool, read_byte, read_float, read_int, read_string};
-use crate::replay::{ReplayFloat, ReplayInt, ReplayTime, Result};
+use super::read_utils::{read_bool, read_float, read_int, read_string};
+use crate::replay::{assert_start_of_block, BlockType, ReplayFloat, ReplayInt, ReplayTime, Result};
 use std::io::Read;
 
 #[derive(PartialEq, Debug)]
@@ -32,14 +31,7 @@ pub struct Info {
 
 impl Info {
     pub(crate) fn load<R: Read>(r: &mut R) -> Result<Info> {
-        match read_byte(r) {
-            Ok(v) => {
-                if v != 0 {
-                    return Err(BsorError::InvalidBsor);
-                }
-            }
-            Err(e) => return Err(e),
-        }
+        assert_start_of_block(r, BlockType::Info)?;
 
         let version = read_string(r)?;
         let game_version = read_string(r)?;
@@ -96,11 +88,23 @@ impl Info {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::replay::BsorError;
     use crate::tests_util::append_str;
     use std::io::Cursor;
 
     #[test]
-    fn it_can_load_info() {
+    fn it_returns_invalid_bsor_error_when_info_block_id_is_invalid() -> Result<()> {
+        let buf = Vec::from([255u8]);
+
+        let result = Info::load(&mut Cursor::new(buf));
+
+        assert!(matches!(result, Err(BsorError::InvalidBsor)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn it_can_load_info() -> Result<()> {
         let version = "0.5.4".to_owned();
         let game_version = "1.27.0".to_owned();
         let timestamp = "1662289178".to_owned();
@@ -125,7 +129,8 @@ mod tests {
         let fail_time = 0.0f32;
         let speed = 0.0f32;
 
-        let mut buf = Vec::from([0 as u8]);
+        let info_id = BlockType::Info.try_into()?;
+        let mut buf = Vec::from([info_id]);
         append_str(&mut buf, &version);
         append_str(&mut buf, &game_version);
         append_str(&mut buf, &timestamp);
@@ -180,5 +185,7 @@ mod tests {
                 speed,
             }
         );
+
+        Ok(())
     }
 }

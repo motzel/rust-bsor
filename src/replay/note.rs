@@ -1,21 +1,18 @@
 use crate::replay::{
-    read_utils, vector::Vector3, BsorError, LineValue, ReplayFloat, ReplayInt, ReplayTime, Result,
+    assert_start_of_block, read_utils, vector::Vector3, BlockType, BsorError, CouldLoadBlock,
+    CouldLoadBlockSize, HasStaticBlockSize, LineValue, ParsedReplayBlock, ReplayFloat, ReplayInt,
+    ReplayTime, Result,
 };
-use std::io::Read;
+use std::io::{Read, Seek, SeekFrom};
+use std::marker::PhantomData;
+use std::mem::size_of;
 
 #[derive(Debug)]
 pub struct Notes(Vec<Note>);
 
 impl Notes {
     pub(crate) fn load<R: Read>(r: &mut R) -> Result<Notes> {
-        match read_utils::read_byte(r) {
-            Ok(v) => {
-                if v != 2 {
-                    return Err(BsorError::InvalidBsor);
-                }
-            }
-            Err(e) => return Err(e),
-        }
+        assert_start_of_block(r, BlockType::Notes)?;
 
         let count = read_utils::read_int(r)? as usize;
         let mut vec = Vec::<Note>::with_capacity(count);
@@ -25,6 +22,15 @@ impl Notes {
         }
 
         Ok(Notes(vec))
+    }
+
+    pub fn load_block<RS: Read + Seek>(
+        r: &mut RS,
+        block: &ParsedReplayBlock<Notes>,
+    ) -> Result<Self> {
+        r.seek(SeekFrom::Start(block.pos))?;
+
+        Self::load(r)
     }
 
     pub fn get_vec(&self) -> &Vec<Note> {
@@ -37,6 +43,50 @@ impl Notes {
 
     pub fn is_empty(&self) -> bool {
         self.0.len() == 0
+    }
+}
+
+impl HasStaticBlockSize for Notes {
+    fn get_static_size() -> usize {
+        size_of::<u8>() + size_of::<ReplayInt>()
+    }
+}
+
+impl CouldLoadBlock for ParsedReplayBlock<Notes> {
+    type Item = Notes;
+
+    fn load<RS: Read + Seek>(&self, r: &mut RS) -> Result<Self::Item> {
+        Self::Item::load_block(r, self)
+    }
+}
+
+impl CouldLoadBlockSize for Notes {
+    type Item = Notes;
+
+    fn get_total_block_size<RS: Read + Seek>(
+        r: &mut RS,
+        pos: u64,
+    ) -> Result<ParsedReplayBlock<Notes>> {
+        assert_start_of_block(r, BlockType::Notes)?;
+
+        let count = read_utils::read_int(r)?;
+
+        let mut bytes = Notes::get_static_size() as u64;
+        let mut current_pos = pos + bytes;
+        for _ in 0..count {
+            let note_bytes = Note::get_total_block_size(r)?;
+            bytes += note_bytes;
+
+            current_pos += note_bytes;
+            r.seek(SeekFrom::Start(current_pos))?;
+        }
+
+        Ok(ParsedReplayBlock::<Notes> {
+            pos,
+            bytes,
+            items_count: count,
+            _phantom: PhantomData,
+        })
     }
 }
 
@@ -94,6 +144,31 @@ impl Note {
             cut_info,
         })
     }
+
+    pub(self) fn get_total_block_size<RS: Read + Seek>(r: &mut RS) -> Result<u64> {
+        // skip to event type field
+        r.seek(SeekFrom::Current(
+            size_of::<ReplayInt>() as i64 + size_of::<ReplayFloat>() as i64 * 2,
+        ))?;
+
+        let event_type = NoteEventType::try_from(read_utils::read_int(r)?)?;
+
+        let bytes = Note::get_static_size() as u64
+            + match &event_type {
+                _x @ NoteEventType::Good | _x @ NoteEventType::Bad => {
+                    NoteCutInfo::get_static_size() as u64
+                }
+                _ => 0,
+            };
+
+        Ok(bytes)
+    }
+}
+
+impl HasStaticBlockSize for Note {
+    fn get_static_size() -> usize {
+        size_of::<ReplayInt>() * 2 + size_of::<ReplayFloat>() * 2
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -150,6 +225,14 @@ impl NoteCutInfo {
             before_cut_rating,
             after_cut_rating,
         })
+    }
+}
+impl HasStaticBlockSize for NoteCutInfo {
+    fn get_static_size() -> usize {
+        size_of::<u8>() * 4
+            + size_of::<ReplayInt>()
+            + size_of::<ReplayFloat>() * 7
+            + size_of::<Vector3>() * 3
     }
 }
 
@@ -412,6 +495,23 @@ mod tests {
         }
     }
 
+    pub(self) fn get_notes_buffer(notes: &Vec<Note>) -> Result<Vec<u8>> {
+        let notes_id = BlockType::Notes.try_into()?;
+        let mut buf: Vec<u8> = Vec::from([notes_id]);
+
+        buf.append(&mut ReplayInt::to_le_bytes(notes.len() as ReplayInt).to_vec());
+        for f in notes.iter() {
+            append_note(&mut buf, &f);
+        }
+
+        Ok(buf)
+    }
+
+    #[test]
+    fn it_returns_correct_static_size_of_note() {
+        assert_eq!(Note::get_static_size(), 16);
+    }
+
     #[test]
     fn it_can_load_good_note() {
         let note = generate_random_note(NoteEventType::Good);
@@ -449,20 +549,72 @@ mod tests {
     }
 
     #[test]
-    fn it_can_load_notes() {
-        let notess = Vec::from([
+    fn it_returns_correct_static_size_of_notes() {
+        assert_eq!(Notes::get_static_size(), 5);
+    }
+
+    #[test]
+    fn it_returns_invalid_bsor_error_when_notes_block_id_is_invalid() -> Result<()> {
+        let notes = Vec::from([
             generate_random_note(NoteEventType::Bomb),
             generate_random_note(NoteEventType::Good),
         ]);
 
-        let mut buf: Vec<u8> = Vec::from([2u8]);
-        buf.append(&mut ReplayInt::to_le_bytes(notess.len() as ReplayInt).to_vec());
-        for n in notess.iter() {
-            append_note(&mut buf, &n);
-        }
+        let mut buf = get_notes_buffer(&notes)?;
+        buf[0] = 255;
+
+        let result = Notes::load(&mut Cursor::new(buf));
+
+        assert!(matches!(result, Err(BsorError::InvalidBsor)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn it_can_load_notes() -> Result<()> {
+        let notes = Vec::from([
+            generate_random_note(NoteEventType::Bomb),
+            generate_random_note(NoteEventType::Good),
+        ]);
+
+        let buf = get_notes_buffer(&notes)?;
 
         let result = Notes::load(&mut Cursor::new(buf)).unwrap();
 
-        assert_eq!(*result.get_vec(), notess)
+        assert_eq!(*result.get_vec(), notes);
+        assert_eq!(result.is_empty(), false);
+        assert_eq!(result.len(), notes.len());
+
+        Ok(())
+    }
+
+    #[test]
+    fn it_can_load_parsed_notes_block() -> Result<()> {
+        let notes = Vec::from([
+            generate_random_note(NoteEventType::Good),
+            generate_random_note(NoteEventType::Bad),
+            generate_random_note(NoteEventType::Miss),
+            generate_random_note(NoteEventType::Miss),
+            generate_random_note(NoteEventType::Bomb),
+        ]);
+
+        let buf = get_notes_buffer(&notes)?;
+
+        let pos = 0;
+        let reader = &mut Cursor::new(buf);
+        let notes_block = Notes::get_total_block_size(reader, pos)?;
+
+        let result = notes_block.load(reader)?;
+
+        assert_eq!(notes_block.pos(), pos);
+        assert_eq!(
+            notes_block.bytes(),
+            Notes::get_static_size() as u64 + 88 * 2 + 16 * 3
+        );
+        assert_eq!(notes_block.is_empty(), false);
+        assert_eq!(notes_block.len(), notes.len() as i32);
+        assert_eq!(*result.get_vec(), notes);
+
+        Ok(())
     }
 }

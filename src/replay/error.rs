@@ -1,5 +1,6 @@
 use std::array::TryFromSliceError;
 use std::num::ParseIntError;
+use std::str::Utf8Error;
 use std::{error, fmt, io};
 
 /// All possible error variants when parsing a BSOR replay
@@ -38,6 +39,12 @@ impl From<ParseIntError> for BsorError {
     }
 }
 
+impl From<Utf8Error> for BsorError {
+    fn from(error: Utf8Error) -> Self {
+        BsorError::DecodingError(Box::new(error))
+    }
+}
+
 impl From<TryFromSliceError> for BsorError {
     fn from(error: TryFromSliceError) -> Self {
         BsorError::DecodingError(Box::new(error))
@@ -49,8 +56,53 @@ impl error::Error for BsorError {
         match &self {
             BsorError::InvalidBsor => None,
             BsorError::UnsupportedVersion(_) => None,
-            BsorError::Io(e) => e.source(),
+            BsorError::Io(e) => Some(e),
             BsorError::DecodingError(e) => e.source(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_can_convert_io_error_to_bsor_error() {
+        let io_err = io::Error::new(std::io::ErrorKind::UnexpectedEof, "Test error");
+
+        match BsorError::try_from(io_err) {
+            Ok(BsorError::Io(_)) => {}
+            _ => panic!("conversion error"),
+        };
+    }
+
+    #[test]
+    fn it_can_convert_parse_int_error_to_bsor_error() {
+        let val = "invalid".parse::<i32>();
+        match BsorError::try_from(val.expect_err("conversion error")) {
+            Ok(BsorError::DecodingError(_)) => assert!(true),
+            _ => panic!("conversion error"),
+        };
+    }
+
+    #[test]
+    fn it_can_convert_parse_utf8_error_to_bsor_error() {
+        let val = std::str::from_utf8(&[0xffu8, 0xff]);
+
+        match BsorError::try_from(val.expect_err("conversion error")) {
+            Ok(BsorError::DecodingError(_)) => assert!(true),
+            _ => panic!("conversion error"),
+        };
+    }
+
+    #[test]
+    fn it_can_convert_from_slice_error_to_bsor_error() {
+        let arr: &[u8] = &[0u8];
+        let val: Result<[u8; 4], TryFromSliceError> = arr.try_into();
+
+        match BsorError::try_from(val.expect_err("conversion error")) {
+            Ok(BsorError::DecodingError(_)) => assert!(true),
+            _ => panic!("conversion error"),
+        };
     }
 }

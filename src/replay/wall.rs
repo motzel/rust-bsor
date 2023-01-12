@@ -1,20 +1,18 @@
-use super::{read_utils, BsorError, ReplayTime, Result};
-use crate::replay::{LineValue, ReplayFloat};
-use std::io::Read;
+use super::{read_utils, ReplayTime, Result};
+use crate::replay::{
+    assert_start_of_block, BlockType, CouldLoadBlock, CouldLoadBlockSize, HasStaticBlockSize,
+    LineValue, ParsedReplayBlock, ReplayFloat, ReplayInt,
+};
+use std::io::{Read, Seek, SeekFrom};
+use std::marker::PhantomData;
+use std::mem::size_of;
 
 #[derive(Debug, PartialEq)]
 pub struct Walls(Vec<Wall>);
 
 impl Walls {
     pub(crate) fn load<R: Read>(r: &mut R) -> Result<Walls> {
-        match read_utils::read_byte(r) {
-            Ok(v) => {
-                if v != 3 {
-                    return Err(BsorError::InvalidBsor);
-                }
-            }
-            Err(e) => return Err(e),
-        }
+        assert_start_of_block(r, BlockType::Walls)?;
 
         let count = read_utils::read_int(r)? as usize;
         let mut vec = Vec::<Wall>::with_capacity(count);
@@ -24,6 +22,15 @@ impl Walls {
         }
 
         Ok(Walls(vec))
+    }
+
+    pub fn load_block<RS: Read + Seek>(
+        r: &mut RS,
+        block: &ParsedReplayBlock<Walls>,
+    ) -> Result<Self> {
+        r.seek(SeekFrom::Start(block.pos))?;
+
+        Self::load(r)
     }
 
     pub fn get_vec(&self) -> &Vec<Wall> {
@@ -36,6 +43,40 @@ impl Walls {
 
     pub fn is_empty(&self) -> bool {
         self.0.len() == 0
+    }
+}
+
+impl HasStaticBlockSize for Walls {
+    fn get_static_size() -> usize {
+        size_of::<u8>() + size_of::<ReplayInt>()
+    }
+}
+
+impl CouldLoadBlock for ParsedReplayBlock<Walls> {
+    type Item = Walls;
+
+    fn load<RS: Read + Seek>(&self, r: &mut RS) -> Result<Self::Item> {
+        Self::Item::load_block(r, self)
+    }
+}
+
+impl CouldLoadBlockSize for Walls {
+    type Item = Walls;
+
+    fn get_total_block_size<RS: Read + Seek>(
+        r: &mut RS,
+        pos: u64,
+    ) -> Result<ParsedReplayBlock<Walls>> {
+        assert_start_of_block(r, BlockType::Walls)?;
+
+        let count = read_utils::read_int(r)?;
+
+        Ok(ParsedReplayBlock::<Walls> {
+            pos,
+            bytes: Walls::get_static_size() as u64 + Wall::get_static_size() as u64 * count as u64,
+            items_count: count,
+            _phantom: PhantomData,
+        })
     }
 }
 
@@ -76,10 +117,20 @@ impl Wall {
     }
 }
 
+impl HasStaticBlockSize for Wall {
+    fn get_static_size() -> usize {
+        size_of::<ReplayInt>() + size_of::<ReplayFloat>() * 3
+    }
+}
+
+impl CouldLoadBlockSize for Wall {
+    type Item = Wall;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::replay::{ReplayFloat, ReplayInt};
+    use crate::replay::{BsorError, ReplayFloat, ReplayInt};
     use rand::random;
     use std::io::Cursor;
 
@@ -104,6 +155,23 @@ mod tests {
         vec.append(&mut ReplayFloat::to_le_bytes(wall.spawn_time).to_vec());
     }
 
+    pub(self) fn get_walls_buffer(walls: &Vec<Wall>) -> Result<Vec<u8>> {
+        let walls_id = BlockType::Walls.try_into()?;
+        let mut buf: Vec<u8> = Vec::from([walls_id]);
+
+        buf.append(&mut ReplayInt::to_le_bytes(walls.len() as ReplayInt).to_vec());
+        for f in walls.iter() {
+            append_wall(&mut buf, &f);
+        }
+
+        Ok(buf)
+    }
+
+    #[test]
+    fn it_returns_correct_static_size_of_wall() {
+        assert_eq!(Wall::get_static_size(), 16);
+    }
+
     #[test]
     fn it_can_load_wall() {
         let wall = generate_random_wall();
@@ -117,17 +185,60 @@ mod tests {
     }
 
     #[test]
-    fn it_can_load_walls() {
+    fn it_returns_correct_static_size_of_walls() {
+        assert_eq!(Walls::get_static_size(), 5);
+    }
+
+    #[test]
+    fn it_returns_invalid_bsor_error_when_walls_block_id_is_invalid() -> Result<()> {
         let walls = Vec::from([generate_random_wall(), generate_random_wall()]);
 
-        let mut buf: Vec<u8> = Vec::from([3u8]);
-        buf.append(&mut ReplayInt::to_le_bytes(walls.len() as ReplayInt).to_vec());
-        for f in walls.iter() {
-            append_wall(&mut buf, &f);
-        }
+        let mut buf = get_walls_buffer(&walls)?;
+        buf[0] = 255;
+
+        let result = Walls::load(&mut Cursor::new(buf));
+
+        assert!(matches!(result, Err(BsorError::InvalidBsor)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn it_can_load_walls() -> Result<()> {
+        let walls = Vec::from([generate_random_wall(), generate_random_wall()]);
+
+        let buf = get_walls_buffer(&walls)?;
 
         let result = Walls::load(&mut Cursor::new(buf)).unwrap();
 
-        assert_eq!(*result.get_vec(), walls)
+        assert_eq!(*result.get_vec(), walls);
+        assert_eq!(result.is_empty(), false);
+        assert_eq!(result.len(), walls.len());
+
+        Ok(())
+    }
+
+    #[test]
+    fn it_can_load_parsed_walls_block() -> Result<()> {
+        let walls = Vec::from([generate_random_wall(), generate_random_wall()]);
+
+        let buf = get_walls_buffer(&walls)?;
+
+        let pos = 0;
+        let reader = &mut Cursor::new(buf);
+        let walls_block = Walls::get_total_block_size(reader, pos)?;
+
+        let result = walls_block.load(reader)?;
+
+        assert_eq!(walls_block.pos(), pos);
+        assert_eq!(
+            walls_block.bytes(),
+            Walls::get_static_size() as u64 + Wall::get_static_size() as u64 * walls.len() as u64
+        );
+        assert_eq!(walls_block.is_empty(), false);
+        assert_eq!(walls_block.len(), walls.len() as i32);
+        assert_eq!(*result.get_vec(), walls);
+
+        Ok(())
     }
 }
