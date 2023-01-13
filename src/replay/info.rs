@@ -89,7 +89,7 @@ impl Info {
 mod tests {
     use super::*;
     use crate::replay::BsorError;
-    use crate::tests_util::append_str;
+    use crate::tests_util::{append_info, generate_random_info};
     use std::io::Cursor;
 
     #[test]
@@ -105,86 +105,16 @@ mod tests {
 
     #[test]
     fn it_can_load_info() -> Result<()> {
-        let version = "0.5.4".to_owned();
-        let game_version = "1.27.0".to_owned();
-        let timestamp = "1662289178".to_owned();
-        let player_id = "76561198035381239".to_owned();
-        let player_name = "xor eax eax".to_owned();
-        let platform = "steam".to_owned();
-        let tracking_system = "Oculus".to_owned();
-        let hmd = "Rift_S".to_owned();
-        let controller = "Unknown".to_owned();
-        let hash = "C3CFED196F96B161C0862EC387E0EE9241CD5B48".to_owned();
-        let song_name = "Novablast".to_owned();
-        let mapper = "Bitz".to_owned();
-        let difficulty = "Expert".to_owned();
-        let score = 1216422;
-        let mode = "Standard".to_owned();
-        let environment = "Timbaland".to_owned();
-        let modifiers = "DA,FS".to_owned();
-        let jump_distance = 19.96f32;
-        let left_handed = false;
-        let height = 1.76f32;
-        let start_time = 0.0f32;
-        let fail_time = 0.0f32;
-        let speed = 0.0f32;
+        let info = generate_random_info();
 
         let info_id = BlockType::Info.try_into()?;
         let mut buf = Vec::from([info_id]);
-        append_str(&mut buf, &version);
-        append_str(&mut buf, &game_version);
-        append_str(&mut buf, &timestamp);
-        append_str(&mut buf, &player_id);
-        append_str(&mut buf, &player_name);
-        append_str(&mut buf, &platform);
-        append_str(&mut buf, &tracking_system);
-        append_str(&mut buf, &hmd);
-        append_str(&mut buf, &controller);
-        append_str(&mut buf, &hash);
-        append_str(&mut buf, &song_name);
-        append_str(&mut buf, &mapper);
-        append_str(&mut buf, &difficulty);
-        buf.append(&mut ReplayInt::to_le_bytes(score).to_vec());
-        append_str(&mut buf, &mode);
-        append_str(&mut buf, &environment);
-        append_str(&mut buf, &modifiers);
-        buf.append(&mut ReplayFloat::to_le_bytes(jump_distance).to_vec());
-        buf.append(&mut (if left_handed { [1] } else { [0] }).to_vec());
-        buf.append(&mut ReplayFloat::to_le_bytes(height).to_vec());
-        buf.append(&mut ReplayFloat::to_le_bytes(start_time).to_vec());
-        buf.append(&mut ReplayFloat::to_le_bytes(fail_time).to_vec());
-        buf.append(&mut ReplayFloat::to_le_bytes(speed).to_vec());
+
+        append_info(&mut buf, &info)?;
 
         let result = Info::load(&mut Cursor::new(buf)).unwrap();
 
-        assert_eq!(
-            result,
-            Info {
-                version,
-                game_version,
-                timestamp: timestamp.parse::<u32>().unwrap(),
-                player_id,
-                player_name,
-                platform,
-                tracking_system,
-                hmd,
-                controller,
-                hash,
-                song_name,
-                mapper,
-                difficulty,
-                score,
-                mode,
-                environment,
-                modifiers,
-                jump_distance,
-                left_handed,
-                height,
-                start_time,
-                fail_time,
-                speed,
-            }
-        );
+        assert_eq!(result, info);
 
         Ok(())
     }

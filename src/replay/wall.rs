@@ -24,6 +24,11 @@ impl Walls {
         Ok(Walls(vec))
     }
 
+    #[cfg(test)]
+    pub(crate) fn new(vec: Vec<Wall>) -> Walls {
+        Walls(vec)
+    }
+
     pub fn load_block<RS: Read + Seek>(
         r: &mut RS,
         block: &ParsedReplayBlock<Walls>,
@@ -130,42 +135,9 @@ impl CouldLoadBlockSize for Wall {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::replay::{BsorError, ReplayFloat, ReplayInt};
-    use rand::random;
+    use crate::replay::BsorError;
+    use crate::tests_util::{append_wall, generate_random_wall, get_walls_buffer};
     use std::io::Cursor;
-
-    pub(crate) fn generate_random_wall() -> Wall {
-        Wall {
-            line_idx: random::<u8>() % 4,
-            obstacle_type: random::<u8>() % 10,
-            width: random::<u8>() % 4,
-            energy: random::<ReplayFloat>() * 100.0,
-            time: random::<ReplayFloat>() * 100.0,
-            spawn_time: random::<ReplayFloat>() * 100.0,
-        }
-    }
-
-    fn append_wall(vec: &mut Vec<u8>, wall: &Wall) {
-        let wall_id: ReplayInt = wall.line_idx as ReplayInt * 100
-            + wall.obstacle_type as ReplayInt * 10
-            + wall.width as ReplayInt;
-        vec.append(&mut ReplayInt::to_le_bytes(wall_id).to_vec());
-        vec.append(&mut ReplayFloat::to_le_bytes(wall.energy).to_vec());
-        vec.append(&mut ReplayFloat::to_le_bytes(wall.time).to_vec());
-        vec.append(&mut ReplayFloat::to_le_bytes(wall.spawn_time).to_vec());
-    }
-
-    pub(self) fn get_walls_buffer(walls: &Vec<Wall>) -> Result<Vec<u8>> {
-        let walls_id = BlockType::Walls.try_into()?;
-        let mut buf: Vec<u8> = Vec::from([walls_id]);
-
-        buf.append(&mut ReplayInt::to_le_bytes(walls.len() as ReplayInt).to_vec());
-        for f in walls.iter() {
-            append_wall(&mut buf, &f);
-        }
-
-        Ok(buf)
-    }
 
     #[test]
     fn it_returns_correct_static_size_of_wall() {

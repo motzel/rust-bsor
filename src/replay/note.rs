@@ -11,6 +11,11 @@ use std::mem::size_of;
 pub struct Notes(Vec<Note>);
 
 impl Notes {
+    #[cfg(test)]
+    pub(crate) fn new(vec: Vec<Note>) -> Notes {
+        Notes(vec)
+    }
+
     pub(crate) fn load<R: Read>(r: &mut R) -> Result<Notes> {
         assert_start_of_block(r, BlockType::Notes)?;
 
@@ -405,107 +410,8 @@ impl PartialEq for ColorType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests_util::{append_vector3, generate_random_vec3};
-    use rand::random;
+    use crate::tests_util::{append_note, generate_random_note, get_notes_buffer};
     use std::io::Cursor;
-
-    pub(crate) fn generate_random_note_cut_info() -> NoteCutInfo {
-        NoteCutInfo {
-            speed_ok: random::<bool>(),
-            direction_ok: random::<bool>(),
-            saber_type_ok: random::<bool>(),
-            was_cut_too_soon: random::<bool>(),
-            saber_speed: random::<ReplayFloat>(),
-            saber_dir: generate_random_vec3(),
-            saber_type: ColorType::try_from(random::<u8>() % 2).unwrap(),
-            time_deviation: random::<ReplayFloat>(),
-            cut_dir_deviation: random::<ReplayFloat>(),
-            cut_point: generate_random_vec3(),
-            cut_normal: generate_random_vec3(),
-            cut_distance_to_center: random::<ReplayFloat>(),
-            cut_angle: random::<ReplayFloat>(),
-            before_cut_rating: random::<ReplayFloat>(),
-            after_cut_rating: random::<ReplayFloat>(),
-        }
-    }
-
-    pub(crate) fn generate_random_note(event_type: NoteEventType) -> Note {
-        let cut_info = match &event_type {
-            _x @ NoteEventType::Good | _x @ NoteEventType::Bad => {
-                Some(generate_random_note_cut_info())
-            }
-            _ => None,
-        };
-
-        Note {
-            scoring_type: NoteScoringType::Normal,
-            line_idx: random::<u8>() % 4,
-            line_layer: random::<u8>() % 3,
-            color_type: ColorType::try_from(random::<u8>() % 2).unwrap(),
-            cut_direction: CutDirection::try_from(random::<u8>() % 9).unwrap(),
-            event_time: random::<ReplayTime>() * 100.0,
-            spawn_time: random::<ReplayTime>() * 100.0,
-            event_type,
-            cut_info,
-        }
-    }
-
-    fn append_note_cut_info(vec: &mut Vec<u8>, cut_info: &NoteCutInfo) {
-        vec.push(cut_info.speed_ok as u8);
-        vec.push(cut_info.direction_ok as u8);
-        vec.push(cut_info.saber_type_ok as u8);
-        vec.push(cut_info.was_cut_too_soon as u8);
-        vec.append(&mut ReplayFloat::to_le_bytes(cut_info.saber_speed).to_vec());
-        append_vector3(vec, &cut_info.saber_dir);
-
-        let saber_type: u8 = cut_info.saber_type.try_into().unwrap();
-        vec.append(&mut ReplayInt::to_le_bytes(saber_type as ReplayInt).to_vec());
-        vec.append(&mut ReplayFloat::to_le_bytes(cut_info.time_deviation).to_vec());
-        vec.append(&mut ReplayFloat::to_le_bytes(cut_info.cut_dir_deviation).to_vec());
-        append_vector3(vec, &cut_info.cut_point);
-        append_vector3(vec, &cut_info.cut_normal);
-        vec.append(&mut ReplayFloat::to_le_bytes(cut_info.cut_distance_to_center).to_vec());
-        vec.append(&mut ReplayFloat::to_le_bytes(cut_info.cut_angle).to_vec());
-        vec.append(&mut ReplayFloat::to_le_bytes(cut_info.before_cut_rating).to_vec());
-        vec.append(&mut ReplayFloat::to_le_bytes(cut_info.after_cut_rating).to_vec());
-    }
-
-    fn append_note(vec: &mut Vec<u8>, note: &Note) {
-        let scoring_type_u8: u8 = NoteScoringType::try_into(note.scoring_type).unwrap();
-        let color_type_u8: u8 = ColorType::try_into(note.color_type).unwrap();
-        let cut_direction_u8: u8 = CutDirection::try_into(note.cut_direction).unwrap();
-
-        let note_id: ReplayInt = scoring_type_u8 as ReplayInt * 10000
-            + note.line_idx as ReplayInt * 1000
-            + note.line_layer as ReplayInt * 100
-            + color_type_u8 as ReplayInt * 10
-            + cut_direction_u8 as ReplayInt;
-        vec.append(&mut ReplayInt::to_le_bytes(note_id).to_vec());
-        vec.append(&mut ReplayFloat::to_le_bytes(note.event_time).to_vec());
-        vec.append(&mut ReplayFloat::to_le_bytes(note.spawn_time).to_vec());
-
-        let event_type: u8 = note.event_type.try_into().unwrap();
-        vec.append(&mut ReplayInt::to_le_bytes(event_type as ReplayInt).to_vec());
-
-        match note.event_type {
-            NoteEventType::Good | NoteEventType::Bad => {
-                append_note_cut_info(vec, note.cut_info.as_ref().unwrap())
-            }
-            _ => {}
-        }
-    }
-
-    pub(self) fn get_notes_buffer(notes: &Vec<Note>) -> Result<Vec<u8>> {
-        let notes_id = BlockType::Notes.try_into()?;
-        let mut buf: Vec<u8> = Vec::from([notes_id]);
-
-        buf.append(&mut ReplayInt::to_le_bytes(notes.len() as ReplayInt).to_vec());
-        for f in notes.iter() {
-            append_note(&mut buf, &f);
-        }
-
-        Ok(buf)
-    }
 
     #[test]
     fn it_returns_correct_static_size_of_note() {

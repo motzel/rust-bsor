@@ -11,6 +11,11 @@ use std::mem::size_of;
 pub struct Frames(Vec<Frame>);
 
 impl Frames {
+    #[cfg(test)]
+    pub(crate) fn new(vec: Vec<Frame>) -> Frames {
+        Frames(vec)
+    }
+
     pub(crate) fn load<R: Read>(r: &mut R) -> Result<Frames> {
         assert_start_of_block(r, BlockType::Frames)?;
 
@@ -140,54 +145,9 @@ impl HasStaticBlockSize for PositionAndRotation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::replay::{BsorError, ReplayFloat};
-    use crate::tests_util::{
-        append_vector3, append_vector4, generate_random_vec3, generate_random_vec4,
-    };
-    use rand::random;
+    use crate::replay::BsorError;
+    use crate::tests_util::{append_frame, generate_random_frame, get_frames_buffer};
     use std::io::Cursor;
-
-    pub(crate) fn generate_random_position_and_rotation() -> PositionAndRotation {
-        PositionAndRotation {
-            position: generate_random_vec3(),
-            rotation: generate_random_vec4(),
-        }
-    }
-
-    pub(crate) fn generate_random_frame() -> Frame {
-        Frame {
-            time: random::<ReplayFloat>() * 100.0,
-            fps: random::<u8>() as ReplayInt,
-            head: generate_random_position_and_rotation(),
-            left_hand: generate_random_position_and_rotation(),
-            right_hand: generate_random_position_and_rotation(),
-        }
-    }
-
-    pub(crate) fn append_position_and_rotation(vec: &mut Vec<u8>, pr: &PositionAndRotation) {
-        append_vector3(vec, &pr.position);
-        append_vector4(vec, &pr.rotation);
-    }
-
-    pub(self) fn get_frames_buffer(frames: &Vec<Frame>) -> Result<Vec<u8>> {
-        let frames_id = BlockType::Frames.try_into()?;
-        let mut buf: Vec<u8> = Vec::from([frames_id]);
-
-        buf.append(&mut ReplayInt::to_le_bytes(frames.len() as ReplayInt).to_vec());
-        for f in frames.iter() {
-            append_frame(&mut buf, &f);
-        }
-
-        Ok(buf)
-    }
-
-    fn append_frame(vec: &mut Vec<u8>, frame: &Frame) {
-        vec.append(&mut ReplayFloat::to_le_bytes(frame.time).to_vec());
-        vec.append(&mut ReplayInt::to_le_bytes(frame.fps).to_vec());
-        append_position_and_rotation(vec, &frame.head);
-        append_position_and_rotation(vec, &frame.left_hand);
-        append_position_and_rotation(vec, &frame.right_hand);
-    }
 
     #[test]
     fn it_returns_correct_static_size_of_frame() {

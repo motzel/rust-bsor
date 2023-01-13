@@ -11,6 +11,11 @@ use std::mem::size_of;
 pub struct Heights(Vec<Height>);
 
 impl Heights {
+    #[cfg(test)]
+    pub(crate) fn new(vec: Vec<Height>) -> Heights {
+        Heights(vec)
+    }
+
     pub(crate) fn load<R: Read>(r: &mut R) -> Result<Heights> {
         match read_utils::read_byte(r) {
             Ok(v) => {
@@ -116,33 +121,8 @@ impl CouldLoadBlockSize for Height {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::replay::{ReplayFloat, ReplayInt};
-    use rand::random;
+    use crate::tests_util::{append_height, generate_random_height, get_heights_buffer};
     use std::io::Cursor;
-
-    pub(crate) fn generate_random_height() -> Height {
-        Height {
-            height: random::<ReplayFloat>() * 2.0,
-            time: random::<ReplayFloat>() * 100.0,
-        }
-    }
-
-    fn append_height(vec: &mut Vec<u8>, height: &Height) {
-        vec.append(&mut ReplayFloat::to_le_bytes(height.height).to_vec());
-        vec.append(&mut ReplayFloat::to_le_bytes(height.time).to_vec());
-    }
-
-    pub(self) fn get_heights_buffer(heights: &Vec<Height>) -> Result<Vec<u8>> {
-        let heights_id = BlockType::Heights.try_into()?;
-        let mut buf: Vec<u8> = Vec::from([heights_id]);
-
-        buf.append(&mut ReplayInt::to_le_bytes(heights.len() as ReplayInt).to_vec());
-        for f in heights.iter() {
-            append_height(&mut buf, &f);
-        }
-
-        Ok(buf)
-    }
 
     #[test]
     fn it_returns_correct_static_size_of_height() {

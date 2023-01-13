@@ -21,8 +21,8 @@ impl fmt::Display for BsorError {
         match self {
             BsorError::InvalidBsor => write!(f, "invalid bsor"),
             BsorError::UnsupportedVersion(v) => write!(f, "invalid bsor version ({})", v),
-            BsorError::Io(e) => write!(f, "{}", e),
-            BsorError::DecodingError(e) => write!(f, "{}", e),
+            BsorError::Io(e) => write!(f, "io error: {}", e),
+            BsorError::DecodingError(e) => write!(f, "decoding error: {}", e),
         }
     }
 }
@@ -68,7 +68,7 @@ mod tests {
 
     #[test]
     fn it_can_convert_io_error_to_bsor_error() {
-        let io_err = io::Error::new(std::io::ErrorKind::UnexpectedEof, "Test error");
+        let io_err = io::Error::new(io::ErrorKind::UnexpectedEof, "Test error");
 
         match BsorError::try_from(io_err) {
             Ok(BsorError::Io(_)) => {}
@@ -104,5 +104,46 @@ mod tests {
             Ok(BsorError::DecodingError(_)) => assert!(true),
             _ => panic!("conversion error"),
         };
+    }
+
+    #[test]
+    fn it_can_get_source_from_bsor_error() {
+        let err: Box<dyn error::Error> = Box::new(BsorError::InvalidBsor);
+        err.source();
+
+        let err: Box<dyn error::Error> = Box::new(BsorError::UnsupportedVersion(1));
+        err.source();
+
+        let err: Box<dyn error::Error> = Box::new(BsorError::Io(io::Error::new(
+            io::ErrorKind::UnexpectedEof,
+            "Test error",
+        )));
+        err.source();
+
+        let err: Box<dyn error::Error> =
+            Box::new(BsorError::DecodingError(Box::new(BsorError::InvalidBsor)));
+        err.source();
+
+        assert!(true);
+    }
+
+    #[test]
+    fn it_can_format_output_string_bsor_error() {
+        let err: Box<dyn error::Error> = Box::new(BsorError::InvalidBsor);
+        assert_eq!(format!("{}", err), "invalid bsor");
+
+        let err: Box<dyn error::Error> = Box::new(BsorError::UnsupportedVersion(1));
+        assert_eq!(format!("{}", err), "invalid bsor version (1)");
+
+        let err: Box<dyn error::Error> = Box::new(BsorError::Io(io::Error::new(
+            io::ErrorKind::UnexpectedEof,
+            "Test error",
+        )));
+        assert_eq!(format!("{}", err), "io error: Test error");
+
+        let err: Box<dyn error::Error> = Box::new(BsorError::DecodingError(Box::new(
+            io::Error::new(io::ErrorKind::UnexpectedEof, "Test error"),
+        )));
+        assert_eq!(format!("{}", err), "decoding error: Test error");
     }
 }

@@ -11,6 +11,11 @@ use std::mem::size_of;
 pub struct Pauses(Vec<Pause>);
 
 impl Pauses {
+    #[cfg(test)]
+    pub(crate) fn new(vec: Vec<Pause>) -> Pauses {
+        Pauses(vec)
+    }
+
     pub(crate) fn load<R: Read>(r: &mut R) -> Result<Pauses> {
         match read_utils::read_byte(r) {
             Ok(v) => {
@@ -116,33 +121,8 @@ impl CouldLoadBlockSize for Pause {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::replay::{ReplayFloat, ReplayInt};
-    use rand::random;
+    use crate::tests_util::{append_pause, generate_random_pause, get_pauses_buffer};
     use std::io::Cursor;
-
-    pub(crate) fn generate_random_pause() -> Pause {
-        Pause {
-            duration: random::<ReplayLong>() % 30,
-            time: random::<ReplayFloat>() * 100.0,
-        }
-    }
-
-    fn append_pause(vec: &mut Vec<u8>, pause: &Pause) {
-        vec.append(&mut ReplayLong::to_le_bytes(pause.duration).to_vec());
-        vec.append(&mut ReplayFloat::to_le_bytes(pause.time).to_vec());
-    }
-
-    pub(self) fn get_pauses_buffer(pauses: &Vec<Pause>) -> Result<Vec<u8>> {
-        let pauses_id = BlockType::Pauses.try_into()?;
-        let mut buf: Vec<u8> = Vec::from([pauses_id]);
-
-        buf.append(&mut ReplayInt::to_le_bytes(pauses.len() as ReplayInt).to_vec());
-        for f in pauses.iter() {
-            append_pause(&mut buf, &f);
-        }
-
-        Ok(buf)
-    }
 
     #[test]
     fn it_returns_correct_static_size_of_pause() {

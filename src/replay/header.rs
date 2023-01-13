@@ -1,7 +1,6 @@
 use super::{error::BsorError, read_utils, Result};
+use crate::replay::BSOR_MAGIC;
 use std::io::Read;
-
-const BSOR_MAGIC: i32 = 0x442d3d69;
 
 pub(crate) struct Header {
     pub version: u8,
@@ -12,7 +11,7 @@ impl Header {
         let magic = read_utils::read_int(r)?;
         let version = read_utils::read_byte(r)?;
 
-        if magic != 0x442d3d69 {
+        if magic != BSOR_MAGIC {
             return Err(BsorError::InvalidBsor);
         }
 
@@ -27,7 +26,7 @@ impl Header {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::replay::ReplayInt;
+    use crate::replay::{ReplayInt, BSOR_MAGIC};
     use rand::random;
     use std::io::Cursor;
 
