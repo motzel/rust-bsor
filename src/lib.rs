@@ -17,6 +17,8 @@ pub mod prelude;
 ///
 /// Since you may rarely need the full replay structure (especially Frames block) and at the same time would like to keep memory usage low, there is also the option of loading only selected blocks (keep in mind that Header and Info blocks are always loaded)
 ///
+/// Note: Unlike [Replay::load()](struct.Replay.html#method.load), which requires any [std::io::Read] reader as an argument, [ParsedReplay::parse()](struct.ParsedReplay.html#method.parse) requires [std::io::Read] + [std::io::Seek] reader
+///
 /// ```no_run
 /// use bsor::prelude::*;
 /// use std::fs::File;

@@ -40,7 +40,9 @@ fn main() {
 }
 ```
 
-Since you may rarely need the full replay structure (especially Frames) and at the same time would like to keep memory usage low, there is also the option of loading only selected blocks (keep in mind that Header and Info blocks are always loaded).
+Since you may rarely need the full replay structure (especially Frames block) and at the same time would like to keep memory usage low, there is also the option of loading only selected blocks (keep in mind that Header and Info blocks are always loaded). 
+
+Note: Unlike ``Replay::load()``, which requires any ``Read`` reader as an argument, ``ParsedReplay::parse()`` requires ``Read + Seek`` reader
 
 ```rust
 use bsor::prelude::*;

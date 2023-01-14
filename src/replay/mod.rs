@@ -29,6 +29,7 @@ pub type ReplayFloat = f32;
 pub type ReplayTime = ReplayFloat;
 pub type LineValue = u8;
 
+/// This type is broadly used across the crate for any operation which may produce an error
 pub type Result<T> = std::result::Result<T, BsorError>;
 
 #[derive(Debug)]
@@ -123,18 +124,22 @@ pub struct ParsedReplayBlock<T> {
 }
 
 impl<T> ParsedReplayBlock<T> {
+    /// Returns block start position in the stream
     pub fn pos(&self) -> u64 {
         self.pos
     }
 
+    /// Returns block size in bytes
     pub fn bytes(&self) -> u64 {
         self.bytes
     }
 
+    /// Returns underlying items count
     pub fn len(&self) -> i32 {
         self.items_count
     }
 
+    /// Returns whether there are any underlying items
     pub fn is_empty(&self) -> bool {
         self.items_count == 0
     }
