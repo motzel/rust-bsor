@@ -6,7 +6,7 @@ Disclaimer: This is my Rust learning project, so expect bugs and non-idomatic co
 
 ## Known limitations
 
-The current version does not support replays that do not conform to the BL Open Replays specification saved by a very old version of the Beat Leader mod (incorrect utf8 string encoding).
+The current version does not support replays that do not conform to the BL Open Replays specification saved by a very old version of the Beat Leader mod (incorrect utf8 string encoding). A failing test for this edge case has been added (ignored for now), will probably be implemented in version 0.3.0.
 
 ## Install
 

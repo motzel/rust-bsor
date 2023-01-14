@@ -172,6 +172,20 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
+    fn it_can_read_incorrectly_encoded_string() {
+        let buf = [
+            26u8, 0, 0, 0, 85, 110, 105, 113, 117, 101, 32, 65, 98, 105, 108, 105, 116, 121, 32,
+            47, 32, 227, 131, 166, 227, 131, 139, 227, 131, 188, 227, 130, 175, 227, 130, 162, 227,
+            131, 147, 227, 131, 170, 227, 131, 134, 227, 130, 163, 11, 0, 0, 0, 110, 97,
+        ];
+
+        let result = read_string(&mut Cursor::new(buf)).unwrap();
+
+        assert_eq!(result, "Unique Ability / ユニークアビリティ");
+    }
+
+    #[test]
     fn it_returns_decoding_error_if_string_is_invalid() {
         let invalid_string_buf = [0xffu8, 0xff];
 
