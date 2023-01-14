@@ -13,7 +13,7 @@ pub enum BsorError {
     /// IO error. Enum value contains concrete [io::Error]
     Io(io::Error),
     /// Decoding error
-    DecodingError(Box<dyn error::Error>),
+    Decoding(Box<dyn error::Error>),
 }
 
 impl fmt::Display for BsorError {
@@ -22,7 +22,7 @@ impl fmt::Display for BsorError {
             BsorError::InvalidBsor => write!(f, "invalid bsor"),
             BsorError::UnsupportedVersion(v) => write!(f, "invalid bsor version ({})", v),
             BsorError::Io(e) => write!(f, "io error: {}", e),
-            BsorError::DecodingError(e) => write!(f, "decoding error: {}", e),
+            BsorError::Decoding(e) => write!(f, "decoding error: {}", e),
         }
     }
 }
@@ -35,19 +35,19 @@ impl From<io::Error> for BsorError {
 
 impl From<ParseIntError> for BsorError {
     fn from(error: ParseIntError) -> Self {
-        BsorError::DecodingError(Box::new(error))
+        BsorError::Decoding(Box::new(error))
     }
 }
 
 impl From<Utf8Error> for BsorError {
     fn from(error: Utf8Error) -> Self {
-        BsorError::DecodingError(Box::new(error))
+        BsorError::Decoding(Box::new(error))
     }
 }
 
 impl From<TryFromSliceError> for BsorError {
     fn from(error: TryFromSliceError) -> Self {
-        BsorError::DecodingError(Box::new(error))
+        BsorError::Decoding(Box::new(error))
     }
 }
 
@@ -57,7 +57,17 @@ impl error::Error for BsorError {
             BsorError::InvalidBsor => None,
             BsorError::UnsupportedVersion(_) => None,
             BsorError::Io(e) => Some(e),
-            BsorError::DecodingError(e) => e.source(),
+            BsorError::Decoding(e) => {
+                if let Some(err) = e.downcast_ref::<ParseIntError>() {
+                    return Some(err);
+                } else if let Some(err) = e.downcast_ref::<TryFromSliceError>() {
+                    return Some(err);
+                } else if let Some(err) = e.downcast_ref::<Utf8Error>() {
+                    return Some(err);
+                }
+
+                return None;
+            }
         }
     }
 }
@@ -65,34 +75,33 @@ impl error::Error for BsorError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::error::Error;
 
     #[test]
     fn it_can_convert_io_error_to_bsor_error() {
         let io_err = io::Error::new(io::ErrorKind::UnexpectedEof, "Test error");
 
-        match BsorError::try_from(io_err) {
-            Ok(BsorError::Io(_)) => {}
-            _ => panic!("conversion error"),
-        };
+        let err = BsorError::try_from(io_err);
+        assert!(matches!(err, Ok(BsorError::Io(_))));
+        assert!(err.unwrap().source().unwrap().is::<io::Error>());
     }
 
     #[test]
     fn it_can_convert_parse_int_error_to_bsor_error() {
         let val = "invalid".parse::<i32>();
-        match BsorError::try_from(val.expect_err("conversion error")) {
-            Ok(BsorError::DecodingError(_)) => assert!(true),
-            _ => panic!("conversion error"),
-        };
+
+        let err = BsorError::try_from(val.expect_err("conversion error"));
+        assert!(matches!(err, Ok(BsorError::Decoding(_))));
+        assert!(err.unwrap().source().unwrap().is::<ParseIntError>());
     }
 
     #[test]
     fn it_can_convert_parse_utf8_error_to_bsor_error() {
         let val = std::str::from_utf8(&[0xffu8, 0xff]);
 
-        match BsorError::try_from(val.expect_err("conversion error")) {
-            Ok(BsorError::DecodingError(_)) => assert!(true),
-            _ => panic!("conversion error"),
-        };
+        let err = BsorError::try_from(val.expect_err("conversion error"));
+        assert!(matches!(err, Ok(BsorError::Decoding(_))));
+        assert!(err.unwrap().source().unwrap().is::<Utf8Error>());
     }
 
     #[test]
@@ -100,50 +109,38 @@ mod tests {
         let arr: &[u8] = &[0u8];
         let val: Result<[u8; 4], TryFromSliceError> = arr.try_into();
 
-        match BsorError::try_from(val.expect_err("conversion error")) {
-            Ok(BsorError::DecodingError(_)) => assert!(true),
-            _ => panic!("conversion error"),
-        };
+        let err = BsorError::try_from(val.expect_err("conversion error"));
+        assert!(matches!(err, Ok(BsorError::Decoding(_))));
+        assert!(err.unwrap().source().unwrap().is::<TryFromSliceError>());
     }
 
     #[test]
     fn it_can_get_source_from_bsor_error() {
-        let err: Box<dyn error::Error> = Box::new(BsorError::InvalidBsor);
-        err.source();
+        let err: Box<dyn Error> = Box::new(BsorError::InvalidBsor);
+        assert!(matches!(err.source(), None));
 
-        let err: Box<dyn error::Error> = Box::new(BsorError::UnsupportedVersion(1));
-        err.source();
-
-        let err: Box<dyn error::Error> = Box::new(BsorError::Io(io::Error::new(
-            io::ErrorKind::UnexpectedEof,
-            "Test error",
-        )));
-        err.source();
-
-        let err: Box<dyn error::Error> =
-            Box::new(BsorError::DecodingError(Box::new(BsorError::InvalidBsor)));
-        err.source();
-
-        assert!(true);
+        let err: Box<dyn Error> = Box::new(BsorError::UnsupportedVersion(1));
+        assert!(matches!(err.source(), None));
     }
 
     #[test]
     fn it_can_format_output_string_bsor_error() {
-        let err: Box<dyn error::Error> = Box::new(BsorError::InvalidBsor);
+        let err: Box<dyn Error> = Box::new(BsorError::InvalidBsor);
         assert_eq!(format!("{}", err), "invalid bsor");
 
-        let err: Box<dyn error::Error> = Box::new(BsorError::UnsupportedVersion(1));
+        let err: Box<dyn Error> = Box::new(BsorError::UnsupportedVersion(1));
         assert_eq!(format!("{}", err), "invalid bsor version (1)");
 
-        let err: Box<dyn error::Error> = Box::new(BsorError::Io(io::Error::new(
+        let err: Box<dyn Error> = Box::new(BsorError::Io(io::Error::new(
             io::ErrorKind::UnexpectedEof,
             "Test error",
         )));
         assert_eq!(format!("{}", err), "io error: Test error");
 
-        let err: Box<dyn error::Error> = Box::new(BsorError::DecodingError(Box::new(
-            io::Error::new(io::ErrorKind::UnexpectedEof, "Test error"),
-        )));
+        let err: Box<dyn Error> = Box::new(BsorError::Decoding(Box::new(io::Error::new(
+            io::ErrorKind::UnexpectedEof,
+            "Test error",
+        ))));
         assert_eq!(format!("{}", err), "decoding error: Test error");
     }
 }
