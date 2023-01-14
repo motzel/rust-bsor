@@ -1,3 +1,4 @@
+pub mod prelude;
 /// Read and parse BS Open Replay (bsor) files
 ///
 /// <https://github.com/BeatLeader/BS-Open-Replay>
@@ -5,7 +6,7 @@
 /// # Examples
 /// Loading the entire replay into memory:
 /// ```no_run
-/// use bsor::replay::Replay;
+/// use bsor::prelude::*;
 /// use std::fs::File;
 /// use std::io::BufReader;
 ///
@@ -17,24 +18,22 @@
 /// Since you may rarely need the full replay structure (especially Frames block) and at the same time would like to keep memory usage low, there is also the option of loading only selected blocks (keep in mind that Header and Info blocks are always loaded)
 ///
 /// ```no_run
-/// use bsor::replay::{ParsedReplay, CouldLoadBlock};
+/// use bsor::prelude::*;
 /// use std::fs::File;
 /// use std::io::BufReader;
 ///
-/// fn main() {
-///     let mut br = &mut BufReader::new(File::open("example.bsor").unwrap());
+/// let mut br = &mut BufReader::new(File::open("example.bsor").unwrap());
 ///
-///     let parsed_replay = ParsedReplay::parse (br).unwrap();
+/// let parsed_replay = ParsedReplay::parse (br).unwrap();
 ///
-///     let notes = parsed_replay.notes.load(br).unwrap();
-///     println!(
-///         "Info: {:#?}\nNotes count: {:#?}",
-///         parsed_replay.info,
-///         notes.len()
-///     );
-///     if !notes.is_empty() {
-///         println!("{:#?}", notes.get_vec()[notes.len() / 2]);
-///     }
+/// let notes = parsed_replay.notes.load(br).unwrap();
+/// println!(
+///     "Info: {:#?}\nNotes count: {:#?}",
+///     parsed_replay.info,
+///     notes.len()
+/// );
+/// if !notes.is_empty() {
+///     println!("{:#?}", notes.get_vec()[notes.len() / 2]);
 /// }
 /// ```
 ///

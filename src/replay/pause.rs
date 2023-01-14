@@ -1,6 +1,6 @@
 use super::{read_utils, BsorError, ReplayTime, Result};
 use crate::replay::{
-    assert_start_of_block, BlockType, CouldLoadBlock, CouldLoadBlockSize, HasStaticBlockSize,
+    assert_start_of_block, BlockType, GetStaticBlockSize, LoadBlock, LoadRealBlockSize,
     ParsedReplayBlock, ReplayFloat, ReplayInt, ReplayLong,
 };
 use std::io::{Read, Seek, SeekFrom};
@@ -58,13 +58,13 @@ impl Pauses {
     }
 }
 
-impl HasStaticBlockSize for Pauses {
+impl GetStaticBlockSize for Pauses {
     fn get_static_size() -> usize {
         size_of::<u8>() + size_of::<ReplayInt>()
     }
 }
 
-impl CouldLoadBlock for ParsedReplayBlock<Pauses> {
+impl LoadBlock for ParsedReplayBlock<Pauses> {
     type Item = Pauses;
 
     fn load<RS: Read + Seek>(&self, r: &mut RS) -> Result<Self::Item> {
@@ -72,10 +72,10 @@ impl CouldLoadBlock for ParsedReplayBlock<Pauses> {
     }
 }
 
-impl CouldLoadBlockSize for Pauses {
+impl LoadRealBlockSize for Pauses {
     type Item = Pauses;
 
-    fn get_total_block_size<RS: Read + Seek>(
+    fn load_real_block_size<RS: Read + Seek>(
         r: &mut RS,
         pos: u64,
     ) -> Result<ParsedReplayBlock<Pauses>> {
@@ -108,13 +108,13 @@ impl Pause {
     }
 }
 
-impl HasStaticBlockSize for Pause {
+impl GetStaticBlockSize for Pause {
     fn get_static_size() -> usize {
         size_of::<ReplayLong>() + size_of::<ReplayFloat>()
     }
 }
 
-impl CouldLoadBlockSize for Pause {
+impl LoadRealBlockSize for Pause {
     type Item = Pause;
 }
 
@@ -183,7 +183,7 @@ mod tests {
 
         let pos = 0;
         let reader = &mut Cursor::new(buf);
-        let walls_block = Pauses::get_total_block_size(reader, pos)?;
+        let walls_block = Pauses::load_real_block_size(reader, pos)?;
 
         let result = walls_block.load(reader)?;
 

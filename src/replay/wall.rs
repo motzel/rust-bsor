@@ -1,7 +1,7 @@
 use super::{read_utils, ReplayTime, Result};
 use crate::replay::{
-    assert_start_of_block, BlockType, CouldLoadBlock, CouldLoadBlockSize, HasStaticBlockSize,
-    LineValue, ParsedReplayBlock, ReplayFloat, ReplayInt,
+    assert_start_of_block, BlockType, GetStaticBlockSize, LineValue, LoadBlock, LoadRealBlockSize,
+    ParsedReplayBlock, ReplayFloat, ReplayInt,
 };
 use std::io::{Read, Seek, SeekFrom};
 use std::marker::PhantomData;
@@ -51,13 +51,13 @@ impl Walls {
     }
 }
 
-impl HasStaticBlockSize for Walls {
+impl GetStaticBlockSize for Walls {
     fn get_static_size() -> usize {
         size_of::<u8>() + size_of::<ReplayInt>()
     }
 }
 
-impl CouldLoadBlock for ParsedReplayBlock<Walls> {
+impl LoadBlock for ParsedReplayBlock<Walls> {
     type Item = Walls;
 
     fn load<RS: Read + Seek>(&self, r: &mut RS) -> Result<Self::Item> {
@@ -65,10 +65,10 @@ impl CouldLoadBlock for ParsedReplayBlock<Walls> {
     }
 }
 
-impl CouldLoadBlockSize for Walls {
+impl LoadRealBlockSize for Walls {
     type Item = Walls;
 
-    fn get_total_block_size<RS: Read + Seek>(
+    fn load_real_block_size<RS: Read + Seek>(
         r: &mut RS,
         pos: u64,
     ) -> Result<ParsedReplayBlock<Walls>> {
@@ -122,13 +122,13 @@ impl Wall {
     }
 }
 
-impl HasStaticBlockSize for Wall {
+impl GetStaticBlockSize for Wall {
     fn get_static_size() -> usize {
         size_of::<ReplayInt>() + size_of::<ReplayFloat>() * 3
     }
 }
 
-impl CouldLoadBlockSize for Wall {
+impl LoadRealBlockSize for Wall {
     type Item = Wall;
 }
 
@@ -198,7 +198,7 @@ mod tests {
 
         let pos = 0;
         let reader = &mut Cursor::new(buf);
-        let walls_block = Walls::get_total_block_size(reader, pos)?;
+        let walls_block = Walls::load_real_block_size(reader, pos)?;
 
         let result = walls_block.load(reader)?;
 

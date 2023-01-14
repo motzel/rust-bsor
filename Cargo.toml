@@ -1,6 +1,6 @@
 [package]
 name = "bsor"
-version = "0.2.0"
+version = "0.2.1"
 description = "Read and parse BS Open Replay (bsor) files"
 license = "GPL-3.0-or-later"
 readme = "README.md"

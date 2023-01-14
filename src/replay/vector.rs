@@ -1,4 +1,4 @@
-use crate::replay::{read_utils, BsorError, HasStaticBlockSize, ReplayFloat};
+use crate::replay::{read_utils, BsorError, GetStaticBlockSize, ReplayFloat};
 use std::io::Read;
 
 #[derive(PartialEq, Clone, Debug)]
@@ -20,7 +20,7 @@ impl Vector3 {
     }
 }
 
-impl HasStaticBlockSize for Vector3 {
+impl GetStaticBlockSize for Vector3 {
     fn get_static_size() -> usize {
         std::mem::size_of::<ReplayFloat>() * 3
     }
@@ -57,7 +57,7 @@ impl Vector4 {
     }
 }
 
-impl HasStaticBlockSize for Vector4 {
+impl GetStaticBlockSize for Vector4 {
     fn get_static_size() -> usize {
         std::mem::size_of::<ReplayFloat>() * 4
     }

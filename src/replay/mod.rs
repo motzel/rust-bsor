@@ -9,7 +9,7 @@ mod read_utils;
 pub mod vector;
 pub mod wall;
 
-pub use error::BsorError;
+use error::BsorError;
 use frame::Frames;
 use header::Header;
 use height::Heights;
@@ -80,24 +80,24 @@ impl ParsedReplay {
         let info = Info::load(r)?;
 
         let frames_pos = r.stream_position()?;
-        let frames = Frames::get_total_block_size(r, frames_pos)?;
+        let frames = Frames::load_real_block_size(r, frames_pos)?;
 
         let notes_pos = frames_pos + frames.bytes;
 
         r.seek(SeekFrom::Start(notes_pos))?;
-        let notes = Notes::get_total_block_size(r, notes_pos)?;
+        let notes = Notes::load_real_block_size(r, notes_pos)?;
 
         let walls_pos = notes_pos + notes.bytes;
         r.seek(SeekFrom::Start(walls_pos))?;
-        let walls = Walls::get_total_block_size(r, walls_pos)?;
+        let walls = Walls::load_real_block_size(r, walls_pos)?;
 
         let heights_pos = walls_pos + walls.bytes;
         r.seek(SeekFrom::Start(heights_pos))?;
-        let heights = Heights::get_total_block_size(r, heights_pos)?;
+        let heights = Heights::load_real_block_size(r, heights_pos)?;
 
         let pauses_pos = heights_pos + heights.bytes;
         r.seek(SeekFrom::Start(pauses_pos))?;
-        let pauses = Pauses::get_total_block_size(r, pauses_pos)?;
+        let pauses = Pauses::load_real_block_size(r, pauses_pos)?;
 
         Ok(ParsedReplay {
             version: header.version,
@@ -140,16 +140,16 @@ impl<T> ParsedReplayBlock<T> {
     }
 }
 
-trait HasStaticBlockSize {
+trait GetStaticBlockSize {
     /// Static block size in bytes (if determinable without reading the replay)
     fn get_static_size() -> usize;
 }
 
-trait CouldLoadBlockSize {
-    type Item: HasStaticBlockSize;
+trait LoadRealBlockSize {
+    type Item: GetStaticBlockSize;
 
-    /// Total block size (includes static size)
-    fn get_total_block_size<RS: Read + Seek>(
+    /// Real block size (includes static size)
+    fn load_real_block_size<RS: Read + Seek>(
         _r: &mut RS,
         pos: u64,
     ) -> Result<ParsedReplayBlock<Self::Item>> {
@@ -162,7 +162,7 @@ trait CouldLoadBlockSize {
     }
 }
 
-pub trait CouldLoadBlock {
+pub trait LoadBlock {
     type Item;
 
     fn load<RS: Read + Seek>(&self, r: &mut RS) -> Result<Self::Item>;

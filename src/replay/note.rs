@@ -1,7 +1,7 @@
 use crate::replay::{
-    assert_start_of_block, read_utils, vector::Vector3, BlockType, BsorError, CouldLoadBlock,
-    CouldLoadBlockSize, HasStaticBlockSize, LineValue, ParsedReplayBlock, ReplayFloat, ReplayInt,
-    ReplayTime, Result,
+    assert_start_of_block, read_utils, vector::Vector3, BlockType, BsorError, GetStaticBlockSize,
+    LineValue, LoadBlock, LoadRealBlockSize, ParsedReplayBlock, ReplayFloat, ReplayInt, ReplayTime,
+    Result,
 };
 use std::io::{Read, Seek, SeekFrom};
 use std::marker::PhantomData;
@@ -51,13 +51,13 @@ impl Notes {
     }
 }
 
-impl HasStaticBlockSize for Notes {
+impl GetStaticBlockSize for Notes {
     fn get_static_size() -> usize {
         size_of::<u8>() + size_of::<ReplayInt>()
     }
 }
 
-impl CouldLoadBlock for ParsedReplayBlock<Notes> {
+impl LoadBlock for ParsedReplayBlock<Notes> {
     type Item = Notes;
 
     fn load<RS: Read + Seek>(&self, r: &mut RS) -> Result<Self::Item> {
@@ -65,10 +65,10 @@ impl CouldLoadBlock for ParsedReplayBlock<Notes> {
     }
 }
 
-impl CouldLoadBlockSize for Notes {
+impl LoadRealBlockSize for Notes {
     type Item = Notes;
 
-    fn get_total_block_size<RS: Read + Seek>(
+    fn load_real_block_size<RS: Read + Seek>(
         r: &mut RS,
         pos: u64,
     ) -> Result<ParsedReplayBlock<Notes>> {
@@ -170,7 +170,7 @@ impl Note {
     }
 }
 
-impl HasStaticBlockSize for Note {
+impl GetStaticBlockSize for Note {
     fn get_static_size() -> usize {
         size_of::<ReplayInt>() * 2 + size_of::<ReplayFloat>() * 2
     }
@@ -232,7 +232,7 @@ impl NoteCutInfo {
         })
     }
 }
-impl HasStaticBlockSize for NoteCutInfo {
+impl GetStaticBlockSize for NoteCutInfo {
     fn get_static_size() -> usize {
         size_of::<u8>() * 4
             + size_of::<ReplayInt>()
@@ -508,7 +508,7 @@ mod tests {
 
         let pos = 0;
         let reader = &mut Cursor::new(buf);
-        let notes_block = Notes::get_total_block_size(reader, pos)?;
+        let notes_block = Notes::load_real_block_size(reader, pos)?;
 
         let result = notes_block.load(reader)?;
 

@@ -1,6 +1,6 @@
 use super::{read_utils, vector, ReplayInt, ReplayTime, Result};
 use crate::replay::{
-    assert_start_of_block, BlockType, CouldLoadBlock, CouldLoadBlockSize, HasStaticBlockSize,
+    assert_start_of_block, BlockType, GetStaticBlockSize, LoadBlock, LoadRealBlockSize,
     ParsedReplayBlock,
 };
 use std::io::{Read, Seek, SeekFrom};
@@ -51,13 +51,13 @@ impl Frames {
     }
 }
 
-impl HasStaticBlockSize for Frames {
+impl GetStaticBlockSize for Frames {
     fn get_static_size() -> usize {
         size_of::<u8>() + size_of::<ReplayInt>()
     }
 }
 
-impl CouldLoadBlock for ParsedReplayBlock<Frames> {
+impl LoadBlock for ParsedReplayBlock<Frames> {
     type Item = Frames;
 
     fn load<RS: Read + Seek>(&self, r: &mut RS) -> Result<Self::Item> {
@@ -65,10 +65,10 @@ impl CouldLoadBlock for ParsedReplayBlock<Frames> {
     }
 }
 
-impl CouldLoadBlockSize for Frames {
+impl LoadRealBlockSize for Frames {
     type Item = Frames;
 
-    fn get_total_block_size<RS: Read + Seek>(
+    fn load_real_block_size<RS: Read + Seek>(
         r: &mut RS,
         pos: u64,
     ) -> Result<ParsedReplayBlock<Frames>> {
@@ -113,7 +113,7 @@ impl Frame {
     }
 }
 
-impl HasStaticBlockSize for Frame {
+impl GetStaticBlockSize for Frame {
     fn get_static_size() -> usize {
         size_of::<ReplayTime>()
             + size_of::<ReplayInt>()
@@ -136,7 +136,7 @@ impl PositionAndRotation {
     }
 }
 
-impl HasStaticBlockSize for PositionAndRotation {
+impl GetStaticBlockSize for PositionAndRotation {
     fn get_static_size() -> usize {
         vector::Vector3::get_static_size() + vector::Vector4::get_static_size()
     }
@@ -208,7 +208,7 @@ mod tests {
 
         let pos = 0;
         let reader = &mut Cursor::new(buf);
-        let frames_block = Frames::get_total_block_size(reader, pos)?;
+        let frames_block = Frames::load_real_block_size(reader, pos)?;
 
         let result = frames_block.load(reader)?;
 
