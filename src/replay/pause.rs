@@ -1,12 +1,15 @@
+//! structs storing the Pauses block data
 use super::{read_utils, BsorError, ReplayTime, Result};
 use crate::replay::{
-    assert_start_of_block, BlockType, GetStaticBlockSize, LoadBlock, LoadRealBlockSize,
-    ParsedReplayBlock, ReplayFloat, ReplayInt, ReplayLong,
+    assert_start_of_block, BlockIndex, BlockType, GetStaticBlockSize, LoadBlock, LoadRealBlockSize,
+    ReplayFloat, ReplayInt, ReplayLong,
 };
 use std::io::{Read, Seek, SeekFrom};
 use std::marker::PhantomData;
 use std::mem::size_of;
+use std::ops::Deref;
 
+/// Struct implements [std::ops::Deref] trait so it could be treated as Vec<[Pause]>
 #[derive(Debug, PartialEq)]
 pub struct Pauses(Vec<Pause>);
 
@@ -38,23 +41,19 @@ impl Pauses {
 
     pub(crate) fn load_block<RS: Read + Seek>(
         r: &mut RS,
-        block: &ParsedReplayBlock<Pauses>,
+        block: &BlockIndex<Pauses>,
     ) -> Result<Self> {
         r.seek(SeekFrom::Start(block.pos))?;
 
         Self::load(r)
     }
+}
 
-    pub fn get_vec(&self) -> &Vec<Pause> {
+impl Deref for Pauses {
+    type Target = Vec<Pause>;
+
+    fn deref(&self) -> &Self::Target {
         &self.0
-    }
-
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.len() == 0
     }
 }
 
@@ -64,9 +63,10 @@ impl GetStaticBlockSize for Pauses {
     }
 }
 
-impl LoadBlock for ParsedReplayBlock<Pauses> {
+impl LoadBlock for BlockIndex<Pauses> {
     type Item = Pauses;
 
+    /// Loads Frames block from ReplayIndex
     fn load<RS: Read + Seek>(&self, r: &mut RS) -> Result<Self::Item> {
         Self::Item::load_block(r, self)
     }
@@ -75,15 +75,12 @@ impl LoadBlock for ParsedReplayBlock<Pauses> {
 impl LoadRealBlockSize for Pauses {
     type Item = Pauses;
 
-    fn load_real_block_size<RS: Read + Seek>(
-        r: &mut RS,
-        pos: u64,
-    ) -> Result<ParsedReplayBlock<Pauses>> {
+    fn load_real_block_size<RS: Read + Seek>(r: &mut RS, pos: u64) -> Result<BlockIndex<Pauses>> {
         assert_start_of_block(r, BlockType::Pauses)?;
 
         let count = read_utils::read_int(r)?;
 
-        Ok(ParsedReplayBlock::<Pauses> {
+        Ok(BlockIndex::<Pauses> {
             pos,
             bytes: Pauses::get_static_size() as u64
                 + Pause::get_static_size() as u64 * count as u64,
@@ -168,15 +165,14 @@ mod tests {
 
         let result = Pauses::load(&mut Cursor::new(buf)).unwrap();
 
-        assert_eq!(*result.get_vec(), pauses);
-        assert_eq!(result.is_empty(), false);
+        assert_eq!(*result, pauses);
         assert_eq!(result.len(), pauses.len());
 
         Ok(())
     }
 
     #[test]
-    fn it_can_load_parsed_pauses_block() -> Result<()> {
+    fn it_can_load_pauses_block_index() -> Result<()> {
         let pauses = Vec::from([generate_random_pause(), generate_random_pause()]);
 
         let buf = get_pauses_buffer(&pauses)?;
@@ -195,7 +191,7 @@ mod tests {
         );
         assert_eq!(walls_block.is_empty(), false);
         assert_eq!(walls_block.len(), pauses.len() as i32);
-        assert_eq!(*result.get_vec(), pauses);
+        assert_eq!(*result, pauses);
 
         Ok(())
     }

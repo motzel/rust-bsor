@@ -1,3 +1,52 @@
+//! A module for loading a bsor file in whole or in parts
+//!
+//! # Examples
+//! Loading the entire replay file into memory:
+//! ```no_run
+//! use bsor::prelude::*;
+//! use std::fs::File;
+//! use std::io::BufReader;
+//!
+//! let br = &mut BufReader::new(File::open("example.bsor").unwrap());
+//! let replay = Replay::load(br).unwrap();
+//! println!("{:#?}", replay);
+//! ```
+//!
+//! Since you may rarely need the full replay structure (especially the largest Frames block, if you do not want to display the replay) and at the same time would like to keep memory usage low, there is also the option of loading only selected blocks (keep in mind that Header and Info blocks are always loaded)
+//!
+//! In this case, the process is a two-step one. In the first step, the replay must be indexed, and then the individual blocks can be loaded into memory.
+//!
+//! Note: Unlike [Replay::load()](replay/struct.Replay.html#method.load), which requires any [std::io::Read] reader as an argument, [ReplayIndex::index()](replay/struct.ReplayIndex.html#method.index) requires [std::io::Read] + [std::io::Seek] reader
+//!
+//! ```no_run
+//! use bsor::prelude::*;
+//! use std::fs::File;
+//! use std::io::BufReader;
+//!
+//! let mut br = &mut BufReader::new(File::open("example.bsor").unwrap());
+//!
+//! let replay_index = ReplayIndex::index(br).unwrap();
+//!
+//! let notes = replay_index.notes.load(br).unwrap();
+//! println!(
+//!     "Info: {:#?}\nNotes count: {:#?}",
+//!     replay_index.info,
+//!     notes.len()
+//! );
+//! if !notes.is_empty() {
+//!     println!("{:#?}", notes[notes.len() / 2]);
+//! }
+//! ```
+//!
+//! The memory savings can be significant, for example, for an **average replay of 1375kB**:
+//!
+//! | Block         | Memory usage |
+//! |---------------|--------------|
+//! | Whole replay  | 1383kB       |
+//! | Header + Info | 9kB          |
+//! | Frames        | 1255kB       |
+//! | Notes         | 137kB        |
+//!
 pub mod error;
 pub mod frame;
 mod header;
@@ -23,15 +72,23 @@ use wall::Walls;
 
 pub(crate) const BSOR_MAGIC: i32 = 0x442d3d69;
 
+/// int type used in replay file
 pub type ReplayInt = i32;
+/// long type used in replay file
 pub type ReplayLong = u64;
+/// float type used in replay file
 pub type ReplayFloat = f32;
+/// time type used in replay file
 pub type ReplayTime = ReplayFloat;
-pub type LineValue = u8;
+/// type used to store note line index
+pub type LineIdx = u8;
+/// type used to store note line layer
+pub type LineLayer = u8;
 
 /// This type is broadly used across the crate for any operation which may produce an error
 pub type Result<T> = std::result::Result<T, BsorError>;
 
+/// Basic crate struct corresponding to the structure of the bsor file
 #[derive(Debug)]
 pub struct Replay {
     pub version: u8,
@@ -44,6 +101,7 @@ pub struct Replay {
 }
 
 impl Replay {
+    /// Load replay into memory
     pub fn load<R: Read>(r: &mut R) -> Result<Replay> {
         let header = Header::load(r)?;
         let info = Info::load(r)?;
@@ -65,18 +123,20 @@ impl Replay {
     }
 }
 
-pub struct ParsedReplay {
+/// Replay index needed to load individual blocks
+pub struct ReplayIndex {
     pub version: u8,
     pub info: Info,
-    pub frames: ParsedReplayBlock<Frames>,
-    pub notes: ParsedReplayBlock<Notes>,
-    pub walls: ParsedReplayBlock<Walls>,
-    pub heights: ParsedReplayBlock<Heights>,
-    pub pauses: ParsedReplayBlock<Pauses>,
+    pub frames: BlockIndex<Frames>,
+    pub notes: BlockIndex<Notes>,
+    pub walls: BlockIndex<Walls>,
+    pub heights: BlockIndex<Heights>,
+    pub pauses: BlockIndex<Pauses>,
 }
 
-impl ParsedReplay {
-    pub fn parse<RS: Read + Seek>(r: &mut RS) -> Result<ParsedReplay> {
+impl ReplayIndex {
+    /// Indexes replay, so you can easily load each block individually
+    pub fn index<RS: Read + Seek>(r: &mut RS) -> Result<ReplayIndex> {
         let header = Header::load(r)?;
         let info = Info::load(r)?;
 
@@ -100,7 +160,7 @@ impl ParsedReplay {
         r.seek(SeekFrom::Start(pauses_pos))?;
         let pauses = Pauses::load_real_block_size(r, pauses_pos)?;
 
-        Ok(ParsedReplay {
+        Ok(ReplayIndex {
             version: header.version,
             info,
             frames,
@@ -112,8 +172,9 @@ impl ParsedReplay {
     }
 }
 
+/// Struct storing index data about each block
 #[derive(Debug)]
-pub struct ParsedReplayBlock<T> {
+pub struct BlockIndex<T> {
     ///! position in stream
     pos: u64,
     ///! block length in bytes
@@ -123,7 +184,7 @@ pub struct ParsedReplayBlock<T> {
     _phantom: PhantomData<T>,
 }
 
-impl<T> ParsedReplayBlock<T> {
+impl<T> BlockIndex<T> {
     /// Returns block start position in the stream
     pub fn pos(&self) -> u64 {
         self.pos
@@ -157,8 +218,8 @@ trait LoadRealBlockSize {
     fn load_real_block_size<RS: Read + Seek>(
         _r: &mut RS,
         pos: u64,
-    ) -> Result<ParsedReplayBlock<Self::Item>> {
-        Ok(ParsedReplayBlock::<Self::Item> {
+    ) -> Result<BlockIndex<Self::Item>> {
+        Ok(BlockIndex::<Self::Item> {
             pos,
             bytes: Self::Item::get_static_size() as u64,
             items_count: 0,
@@ -167,6 +228,7 @@ trait LoadRealBlockSize {
     }
 }
 
+/// Trait to load individual blocks into memory based on indexed data
 pub trait LoadBlock {
     type Item;
 
@@ -219,36 +281,31 @@ mod tests {
 
         assert_eq!(result.version, replay.version);
         assert_eq!(result.info, replay.info);
-        assert_eq!(result.frames.get_vec(), replay.frames.get_vec());
-        assert_eq!(result.notes.get_vec(), replay.notes.get_vec());
-        assert_eq!(result.walls.get_vec(), replay.walls.get_vec());
-        assert_eq!(result.heights.get_vec(), replay.heights.get_vec());
-        assert_eq!(result.pauses.get_vec(), replay.pauses.get_vec());
+        assert_eq!(result.frames, replay.frames);
+        assert_eq!(result.notes, replay.notes);
+        assert_eq!(result.walls, replay.walls);
+        assert_eq!(result.heights, replay.heights);
+        assert_eq!(result.pauses, replay.pauses);
 
         Ok(())
     }
 
     #[test]
-    fn it_can_parse_replay() -> Result<()> {
+    fn it_can_index_replay() -> Result<()> {
         let replay = generate_random_replay();
 
         let buf = get_replay_buffer(&replay)?;
 
         let reader = &mut Cursor::new(buf);
-        let result = ParsedReplay::parse(reader)?;
+        let result = ReplayIndex::index(reader)?;
 
         assert_eq!(result.version, replay.version);
         assert_eq!(result.info, replay.info);
         assert_eq!(result.frames.len(), replay.frames.len() as i32);
-        assert_eq!(result.frames.is_empty(), replay.frames.len() == 0);
         assert_eq!(result.notes.len(), replay.notes.len() as i32);
-        assert_eq!(result.notes.is_empty(), replay.notes.len() == 0);
         assert_eq!(result.walls.len(), replay.walls.len() as i32);
-        assert_eq!(result.walls.is_empty(), replay.walls.len() == 0);
         assert_eq!(result.heights.len(), replay.heights.len() as i32);
-        assert_eq!(result.heights.is_empty(), replay.heights.len() == 0);
         assert_eq!(result.pauses.len(), replay.pauses.len() as i32);
-        assert_eq!(result.pauses.is_empty(), replay.pauses.len() == 0);
 
         Ok(())
     }

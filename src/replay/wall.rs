@@ -1,12 +1,15 @@
+//! structs storing the Walls block data
 use super::{read_utils, ReplayTime, Result};
 use crate::replay::{
-    assert_start_of_block, BlockType, GetStaticBlockSize, LineValue, LoadBlock, LoadRealBlockSize,
-    ParsedReplayBlock, ReplayFloat, ReplayInt,
+    assert_start_of_block, BlockIndex, BlockType, GetStaticBlockSize, LineIdx, LoadBlock,
+    LoadRealBlockSize, ReplayFloat, ReplayInt,
 };
 use std::io::{Read, Seek, SeekFrom};
 use std::marker::PhantomData;
 use std::mem::size_of;
+use std::ops::Deref;
 
+/// Struct implements [std::ops::Deref] trait so it could be treated as Vec<[Wall]>
 #[derive(Debug, PartialEq)]
 pub struct Walls(Vec<Wall>);
 
@@ -29,25 +32,22 @@ impl Walls {
         Walls(vec)
     }
 
+    /// Loads Frames block from ReplayIndex
     pub(crate) fn load_block<RS: Read + Seek>(
         r: &mut RS,
-        block: &ParsedReplayBlock<Walls>,
+        block: &BlockIndex<Walls>,
     ) -> Result<Self> {
         r.seek(SeekFrom::Start(block.pos))?;
 
         Self::load(r)
     }
+}
 
-    pub fn get_vec(&self) -> &Vec<Wall> {
+impl Deref for Walls {
+    type Target = Vec<Wall>;
+
+    fn deref(&self) -> &Self::Target {
         &self.0
-    }
-
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.len() == 0
     }
 }
 
@@ -57,7 +57,7 @@ impl GetStaticBlockSize for Walls {
     }
 }
 
-impl LoadBlock for ParsedReplayBlock<Walls> {
+impl LoadBlock for BlockIndex<Walls> {
     type Item = Walls;
 
     fn load<RS: Read + Seek>(&self, r: &mut RS) -> Result<Self::Item> {
@@ -68,15 +68,12 @@ impl LoadBlock for ParsedReplayBlock<Walls> {
 impl LoadRealBlockSize for Walls {
     type Item = Walls;
 
-    fn load_real_block_size<RS: Read + Seek>(
-        r: &mut RS,
-        pos: u64,
-    ) -> Result<ParsedReplayBlock<Walls>> {
+    fn load_real_block_size<RS: Read + Seek>(r: &mut RS, pos: u64) -> Result<BlockIndex<Walls>> {
         assert_start_of_block(r, BlockType::Walls)?;
 
         let count = read_utils::read_int(r)?;
 
-        Ok(ParsedReplayBlock::<Walls> {
+        Ok(BlockIndex::<Walls> {
             pos,
             bytes: Walls::get_static_size() as u64 + Wall::get_static_size() as u64 * count as u64,
             items_count: count,
@@ -87,7 +84,7 @@ impl LoadRealBlockSize for Walls {
 
 #[derive(PartialEq, Debug)]
 pub struct Wall {
-    pub line_idx: LineValue,
+    pub line_idx: LineIdx,
     pub obstacle_type: u8,
     pub width: u8,
     pub energy: ReplayFloat,
@@ -99,7 +96,7 @@ impl Wall {
     pub(crate) fn load<R: Read>(r: &mut R) -> Result<Wall> {
         let mut wall_id = read_utils::read_int(r)?;
 
-        let line_idx = (wall_id / 100) as LineValue;
+        let line_idx = (wall_id / 100) as LineIdx;
         wall_id %= 100;
 
         let obstacle_type = (wall_id / 10) as u8;
@@ -183,15 +180,14 @@ mod tests {
 
         let result = Walls::load(&mut Cursor::new(buf)).unwrap();
 
-        assert_eq!(*result.get_vec(), walls);
-        assert_eq!(result.is_empty(), false);
+        assert_eq!(*result, walls);
         assert_eq!(result.len(), walls.len());
 
         Ok(())
     }
 
     #[test]
-    fn it_can_load_parsed_walls_block() -> Result<()> {
+    fn it_can_load_walls_block_index() -> Result<()> {
         let walls = Vec::from([generate_random_wall(), generate_random_wall()]);
 
         let buf = get_walls_buffer(&walls)?;
@@ -207,9 +203,8 @@ mod tests {
             walls_block.bytes(),
             Walls::get_static_size() as u64 + Wall::get_static_size() as u64 * walls.len() as u64
         );
-        assert_eq!(walls_block.is_empty(), false);
         assert_eq!(walls_block.len(), walls.len() as i32);
-        assert_eq!(*result.get_vec(), walls);
+        assert_eq!(*result, walls);
 
         Ok(())
     }

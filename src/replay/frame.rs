@@ -1,12 +1,14 @@
+//! structs storing the Frames block data
 use super::{read_utils, vector, ReplayInt, ReplayTime, Result};
 use crate::replay::{
-    assert_start_of_block, BlockType, GetStaticBlockSize, LoadBlock, LoadRealBlockSize,
-    ParsedReplayBlock,
+    assert_start_of_block, BlockIndex, BlockType, GetStaticBlockSize, LoadBlock, LoadRealBlockSize,
 };
 use std::io::{Read, Seek, SeekFrom};
 use std::marker::PhantomData;
 use std::mem::size_of;
+use std::ops::Deref;
 
+/// Struct implements [std::ops::Deref] trait so it could be treated as Vec<[Frame]>
 #[derive(Debug, PartialEq)]
 pub struct Frames(Vec<Frame>);
 
@@ -31,23 +33,19 @@ impl Frames {
 
     pub(crate) fn load_block<RS: Read + Seek>(
         r: &mut RS,
-        block: &ParsedReplayBlock<Frames>,
+        block: &BlockIndex<Frames>,
     ) -> Result<Self> {
         r.seek(SeekFrom::Start(block.pos))?;
 
         Self::load(r)
     }
+}
 
-    pub fn get_vec(&self) -> &Vec<Frame> {
+impl Deref for Frames {
+    type Target = Vec<Frame>;
+
+    fn deref(&self) -> &Self::Target {
         &self.0
-    }
-
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.len() == 0
     }
 }
 
@@ -57,9 +55,10 @@ impl GetStaticBlockSize for Frames {
     }
 }
 
-impl LoadBlock for ParsedReplayBlock<Frames> {
+impl LoadBlock for BlockIndex<Frames> {
     type Item = Frames;
 
+    /// Loads Frames block from ReplayIndex
     fn load<RS: Read + Seek>(&self, r: &mut RS) -> Result<Self::Item> {
         Self::Item::load_block(r, self)
     }
@@ -68,15 +67,12 @@ impl LoadBlock for ParsedReplayBlock<Frames> {
 impl LoadRealBlockSize for Frames {
     type Item = Frames;
 
-    fn load_real_block_size<RS: Read + Seek>(
-        r: &mut RS,
-        pos: u64,
-    ) -> Result<ParsedReplayBlock<Frames>> {
+    fn load_real_block_size<RS: Read + Seek>(r: &mut RS, pos: u64) -> Result<BlockIndex<Frames>> {
         assert_start_of_block(r, BlockType::Frames)?;
 
         let count = read_utils::read_int(r)?;
 
-        Ok(ParsedReplayBlock::<Frames> {
+        Ok(BlockIndex::<Frames> {
             pos,
             bytes: Frames::get_static_size() as u64
                 + Frame::get_static_size() as u64 * count as u64,
@@ -188,8 +184,7 @@ mod tests {
 
         let result = Frames::load(&mut Cursor::new(buf)).unwrap();
 
-        assert_eq!(*result.get_vec(), frames);
-        assert_eq!(result.is_empty(), false);
+        assert_eq!(*result, frames);
         assert_eq!(result.len(), frames.len());
 
         Ok(())
@@ -201,7 +196,7 @@ mod tests {
     }
 
     #[test]
-    fn it_can_load_parsed_frames_block() -> Result<()> {
+    fn it_can_load_frames_block_index() -> Result<()> {
         let frames = Vec::from([generate_random_frame(), generate_random_frame()]);
 
         let buf = get_frames_buffer(&frames)?;
@@ -217,9 +212,8 @@ mod tests {
             frames_block.bytes(),
             Frames::get_static_size() as u64 + Frame::get_static_size() as u64 * 2
         );
-        assert_eq!(frames_block.is_empty(), false);
         assert_eq!(frames_block.len(), frames.len() as i32);
-        assert_eq!(*result.get_vec(), frames);
+        assert_eq!(*result, frames);
 
         Ok(())
     }
