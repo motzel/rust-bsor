@@ -1,3 +1,4 @@
+//! auxiliary structs storing data about vectors
 use crate::replay::{read_utils, BsorError, GetStaticBlockSize, ReplayFloat};
 use std::io::Read;
 

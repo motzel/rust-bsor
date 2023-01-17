@@ -1,3 +1,4 @@
+//! structs storing the Info block data
 use super::read_utils::{read_bool, read_float, read_int, read_string};
 use crate::replay::{assert_start_of_block, BlockType, ReplayFloat, ReplayInt, ReplayTime, Result};
 use std::io::Read;

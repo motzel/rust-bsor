@@ -1,3 +1,4 @@
+//! errors used in crate
 use std::array::TryFromSliceError;
 use std::num::ParseIntError;
 use std::str::Utf8Error;

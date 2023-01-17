@@ -6,7 +6,7 @@ Disclaimer: This is my Rust learning project, so expect bugs and non-idomatic co
 
 ## Known limitations
 
-The current version does not support replays that do not conform to the BL Open Replays specification saved by a very old version of the Beat Leader mod (incorrect utf8 string encoding). A failing test for this edge case has been added (ignored for now), will probably be implemented in version 0.3.0.
+The current version does not support replays that do not conform to the BL Open Replays specification saved by a very old version of the Beat Leader mod (incorrect utf8 string encoding). A failing test for this edge case has been added (ignored for now), will probably be implemented in version 0.4.0.
 
 ## Install
 
@@ -19,7 +19,7 @@ cargo add bsor
 Or add the following line to your ``[dependencies]`` section of the ``Cargo.toml``:
 
 ```toml
-bsor = "0.2.1"
+bsor = "0.3"
 ```
 
 ## Usage
@@ -52,16 +52,25 @@ use std::io::BufReader;
 fn main() {
     let mut br = BufReader::new(File::open("example.bsor").unwrap());
 
-    let parsed_replay = ParsedReplay::parse(br).unwrap();
-
-    let notes = parsed_replay.notes.load(br).unwrap();
+    let replay_index = ReplayIndex::index(br).unwrap();
+    
+    let notes = replay_index.notes.load(br).unwrap();
+    
     println!(
         "Info: {:#?}\nNotes count: {:#?}",
-        parsed_replay.info,
+        replay_index.info,
         notes.len()
     );
+
     if !notes.is_empty() {
-        println!("{:#?}", notes.get_vec()[notes.len() / 2]);
+        let notes_count = notes.len();
+        let idx = notes_count / 2;
+        println!(
+            "Note[{}] = {:#?}",
+            idx, notes[idx]
+        );
+    } else {
+        println!("Replay contains no notes 🤔");
     }
 }
 

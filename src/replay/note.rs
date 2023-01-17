@@ -1,13 +1,16 @@
+//! structs storing the Notes block data
 use crate::replay::{
-    assert_start_of_block, read_utils, vector::Vector3, BlockType, BsorError, GetStaticBlockSize,
-    LineValue, LoadBlock, LoadRealBlockSize, ParsedReplayBlock, ReplayFloat, ReplayInt, ReplayTime,
-    Result,
+    assert_start_of_block, read_utils, vector::Vector3, BlockIndex, BlockType, BsorError,
+    GetStaticBlockSize, LineIdx, LineLayer, LoadBlock, LoadRealBlockSize, ReplayFloat, ReplayInt,
+    ReplayTime, Result,
 };
 use std::io::{Read, Seek, SeekFrom};
 use std::marker::PhantomData;
 use std::mem::size_of;
+use std::ops::Deref;
 
-#[derive(Debug)]
+/// Struct implements [std::ops::Deref] trait so it could be treated as Vec<[Note]>
+#[derive(Debug, PartialEq)]
 pub struct Notes(Vec<Note>);
 
 impl Notes {
@@ -31,23 +34,19 @@ impl Notes {
 
     pub(crate) fn load_block<RS: Read + Seek>(
         r: &mut RS,
-        block: &ParsedReplayBlock<Notes>,
+        block: &BlockIndex<Notes>,
     ) -> Result<Self> {
         r.seek(SeekFrom::Start(block.pos))?;
 
         Self::load(r)
     }
+}
 
-    pub fn get_vec(&self) -> &Vec<Note> {
+impl Deref for Notes {
+    type Target = Vec<Note>;
+
+    fn deref(&self) -> &Self::Target {
         &self.0
-    }
-
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.len() == 0
     }
 }
 
@@ -57,9 +56,10 @@ impl GetStaticBlockSize for Notes {
     }
 }
 
-impl LoadBlock for ParsedReplayBlock<Notes> {
+impl LoadBlock for BlockIndex<Notes> {
     type Item = Notes;
 
+    /// Loads Frames block from ReplayIndex
     fn load<RS: Read + Seek>(&self, r: &mut RS) -> Result<Self::Item> {
         Self::Item::load_block(r, self)
     }
@@ -68,10 +68,7 @@ impl LoadBlock for ParsedReplayBlock<Notes> {
 impl LoadRealBlockSize for Notes {
     type Item = Notes;
 
-    fn load_real_block_size<RS: Read + Seek>(
-        r: &mut RS,
-        pos: u64,
-    ) -> Result<ParsedReplayBlock<Notes>> {
+    fn load_real_block_size<RS: Read + Seek>(r: &mut RS, pos: u64) -> Result<BlockIndex<Notes>> {
         assert_start_of_block(r, BlockType::Notes)?;
 
         let count = read_utils::read_int(r)?;
@@ -86,7 +83,7 @@ impl LoadRealBlockSize for Notes {
             r.seek(SeekFrom::Start(current_pos))?;
         }
 
-        Ok(ParsedReplayBlock::<Notes> {
+        Ok(BlockIndex::<Notes> {
             pos,
             bytes,
             items_count: count,
@@ -95,13 +92,11 @@ impl LoadRealBlockSize for Notes {
     }
 }
 
-type LayerValue = u8;
-
 #[derive(Debug, PartialEq)]
 pub struct Note {
     pub scoring_type: NoteScoringType,
-    pub line_idx: LineValue,
-    pub line_layer: LayerValue,
+    pub line_idx: LineIdx,
+    pub line_layer: LineLayer,
     pub color_type: ColorType,
     pub cut_direction: CutDirection,
     pub event_time: ReplayTime,
@@ -117,10 +112,10 @@ impl Note {
         let scoring_type = NoteScoringType::try_from((note_id / 10000) as u8)?;
         note_id %= 10000;
 
-        let line_idx = (note_id / 1000) as LineValue;
+        let line_idx = (note_id / 1000) as LineIdx;
         note_id %= 1000;
 
-        let line_layer = (note_id / 100) as LayerValue;
+        let line_layer = (note_id / 100) as LineLayer;
         note_id %= 100;
 
         let color_type = ColorType::try_from((note_id / 10) as u8)?;
@@ -487,15 +482,14 @@ mod tests {
 
         let result = Notes::load(&mut Cursor::new(buf)).unwrap();
 
-        assert_eq!(*result.get_vec(), notes);
-        assert_eq!(result.is_empty(), false);
+        assert_eq!(*result, notes);
         assert_eq!(result.len(), notes.len());
 
         Ok(())
     }
 
     #[test]
-    fn it_can_load_parsed_notes_block() -> Result<()> {
+    fn it_can_load_notes_block_index() -> Result<()> {
         let notes = Vec::from([
             generate_random_note(NoteEventType::Good),
             generate_random_note(NoteEventType::Bad),
@@ -517,9 +511,8 @@ mod tests {
             notes_block.bytes(),
             Notes::get_static_size() as u64 + 88 * 2 + 16 * 3
         );
-        assert_eq!(notes_block.is_empty(), false);
         assert_eq!(notes_block.len(), notes.len() as i32);
-        assert_eq!(*result.get_vec(), notes);
+        assert_eq!(*result, notes);
 
         Ok(())
     }

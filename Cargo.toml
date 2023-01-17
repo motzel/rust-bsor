@@ -1,7 +1,7 @@
 [package]
 name = "bsor"
-version = "0.2.1"
-description = "Read and parse BS Open Replay (bsor) files"
+version = "0.3.0"
+description = "BS Open Replay (bsor) loader"
 license = "GPL-3.0-or-later"
 readme = "README.md"
 repository = "https://github.com/motzel/rust-bsor"

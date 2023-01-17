@@ -17,12 +17,7 @@ fn main() {
         if !notes.is_empty() {
             let notes_count = notes.len();
             let idx = notes_count / 2;
-            println!(
-                "Info: {:#?}\nNote[{}] = {:#?}",
-                parsed_replay.info,
-                idx,
-                notes.get_vec()[idx]
-            );
+            println!("Note[{}] = {:#?}", idx, notes[idx]);
         } else {
             println!("Replay contains no notes 🤔");
         }
