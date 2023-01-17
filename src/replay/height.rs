@@ -36,7 +36,7 @@ impl Heights {
         Ok(Heights(vec))
     }
 
-    pub fn load_block<RS: Read + Seek>(
+    pub(crate) fn load_block<RS: Read + Seek>(
         r: &mut RS,
         block: &ParsedReplayBlock<Heights>,
     ) -> Result<Self> {

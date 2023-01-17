@@ -36,7 +36,7 @@ impl Pauses {
         Ok(Pauses(vec))
     }
 
-    pub fn load_block<RS: Read + Seek>(
+    pub(crate) fn load_block<RS: Read + Seek>(
         r: &mut RS,
         block: &ParsedReplayBlock<Pauses>,
     ) -> Result<Self> {
